@@ -39,7 +39,15 @@ type Shot = {
   style: LandingStyle;
 };
 
-export function CoinFlipPanel({ page = false, onStaked }: { page?: boolean; onStaked?: () => void }) {
+export function CoinFlipPanel({
+  page = false,
+  live = null,
+  onStake
+}: {
+  page?: boolean;
+  live?: CoinFlipState | null;
+  onStake?: (optionId: Face) => Promise<CoinFlipState>;
+}) {
   const [open, setOpen] = useState(page);
   const [state, setState] = useState<CoinFlipState | null>(null);
   const [error, setError] = useState("");
@@ -51,34 +59,28 @@ export function CoinFlipPanel({ page = false, onStaked }: { page?: boolean; onSt
   const picked = useRef<Face | null>(null);
 
   useEffect(() => {
-    if (!page && !open) return;
-    let stop = false;
-    async function load() {
-      try {
-        const next = await api.coinFlip();
-        if (stop) return;
-        setState((current) => {
-          if (picked.current && next.myOption !== picked.current && next.status !== "settled") {
-            return { ...next, myOption: picked.current };
-          }
-          picked.current = (next.myOption as Face | null) ?? picked.current;
-          return current?.startsAt === next.startsAt && current.myOption === next.myOption && current.counts.heads === next.counts.heads && current.counts.tails === next.counts.tails && current.counts.edge === next.counts.edge
-            ? current
-            : next;
-        });
-        setError("");
-        playClosedWindow(next);
-      } catch (err) {
-        if (!stop) setError(err instanceof Error ? err.message : "Coin flip unavailable");
+    if (!live) return;
+    setState((current) => {
+      if (picked.current && live.myOption !== picked.current && live.status !== "settled" && live.startsAt === current?.startsAt) {
+        return { ...live, myOption: picked.current };
       }
+      picked.current = (live.myOption as Face | null) ?? (live.startsAt === current?.startsAt ? picked.current : null);
+      return live;
+    });
+    setError("");
+    const closed = new Date(live.closesAt).getTime() <= Date.now();
+    if (!closed || playedWindow.current === live.startsAt) return;
+    if (live.winningOptionId) {
+      playedWindow.current = live.startsAt;
+      setCaption(`Window closed. Landing on ${live.winningOptionId}.`);
+      setShot({ id: Date.now(), face: live.winningOptionId, style: Math.random() < 0.55 ? "bounce" : "spin" });
+    } else if (!live.sideBetId) {
+      playedWindow.current = live.startsAt;
+      const face = previewFace();
+      setCaption(`No stakes. Preview landing on ${face}.`);
+      setShot({ id: Date.now(), face, style: Math.random() < 0.55 ? "bounce" : "spin" });
     }
-    void load();
-    const timer = window.setInterval(() => void load(), 2000);
-    return () => {
-      stop = true;
-      window.clearInterval(timer);
-    };
-  }, [open, page]);
+  }, [live]);
 
   useEffect(() => {
     if (!page && !open) return;
@@ -91,11 +93,10 @@ export function CoinFlipPanel({ page = false, onStaked }: { page?: boolean; onSt
     setError("");
     setStaking(optionId);
     try {
-      const next = await api.stakeCoinFlip(optionId);
+      const next = onStake ? await onStake(optionId) : await api.stakeCoinFlip(optionId);
       picked.current = (next.myOption as Face | null) ?? optionId;
       setState(next);
       setCaption(`You picked ${optionId}. 1 credit.`);
-      onStaked?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Stake failed");
     } finally {
@@ -105,44 +106,6 @@ export function CoinFlipPanel({ page = false, onStaked }: { page?: boolean; onSt
 
   const closesIn = state ? Math.max(0, new Date(state.closesAt).getTime() - now) : 0;
   const betting = Boolean(state) && closesIn > 10_000 && state?.status !== "settled";
-
-  function playClosedWindow(next: CoinFlipState) {
-    const closed = new Date(next.closesAt).getTime() <= Date.now();
-    if (!closed || playedWindow.current === next.startsAt) return;
-    if (next.winningOptionId) {
-      playedWindow.current = next.startsAt;
-      setCaption(`Window closed. Landing on ${next.winningOptionId}.`);
-      setShot({ id: Date.now(), face: next.winningOptionId, style: Math.random() < 0.55 ? "bounce" : "spin" });
-      return;
-    }
-    if (!next.sideBetId) {
-      playedWindow.current = next.startsAt;
-      const face = previewFace();
-      setCaption(`No stakes. Preview landing on ${face}.`);
-      setShot({ id: Date.now(), face, style: Math.random() < 0.55 ? "bounce" : "spin" });
-    }
-  }
-
-  useEffect(() => {
-    if ((!page && !open) || !state || closesIn > 0 || playedWindow.current === state.startsAt) return;
-    let stop = false;
-    async function resolve() {
-      try {
-        const next = await api.coinFlip();
-        if (stop) return;
-        setState(next);
-        playClosedWindow(next);
-      } catch (err) {
-        if (!stop) setError(err instanceof Error ? err.message : "Coin flip unavailable");
-      }
-    }
-    void resolve();
-    const timer = window.setInterval(() => void resolve(), 400);
-    return () => {
-      stop = true;
-      window.clearInterval(timer);
-    };
-  }, [closesIn, open, page, state]);
 
   const board = (
           <section className={page ? "coin-modal coin-page" : "coin-modal"} onClick={(event) => event.stopPropagation()}>

@@ -109,7 +109,8 @@ const STATION_ALPHA_GROUP_NAME = "Station Alpha";
 
 type RealtimeNotifier = {
   sideBetChanged: (betId: string, reason: string) => Promise<void>;
-  walletChanged: (userIds: string | string[], reason: string) => Promise<void>;
+  walletChanged: (userIds: string | string[], reason: string, detail?: { creditsBalance: number; transaction: unknown }) => Promise<void>;
+  coinFlipChanged: () => Promise<void>;
   adminChanged: (reason: string) => Promise<void>;
   chatMessage: (message: ChatMessage) => Promise<void>;
 };

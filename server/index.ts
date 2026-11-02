@@ -3,7 +3,7 @@ import http from "node:http";
 import cors from "cors";
 import express from "express";
 import helmet from "helmet";
-import { settleDueCoinFlips } from "./coinFlip.js";
+import { getCoinFlipState, settleDueCoinFlips, stakeCoinFlip } from "./coinFlip.js";
 import { createApiRouter } from "./routes.js";
 import { assertServerConfig, config } from "./config.js";
 import { createSocketServer } from "./socket.js";
@@ -13,7 +13,7 @@ assertServerConfig();
 
 const app = express();
 const server = http.createServer(app);
-const io = createSocketServer(server);
+const io = createSocketServer(server, (userId, optionId) => stakeCoinFlip(userId, optionId, realtime));
 
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors({ origin: true, credentials: true }));
@@ -23,11 +23,15 @@ const realtime = {
   async sideBetChanged(betId: string, reason: string) {
     io.to("side-bets").to(`side-bet:${betId}`).emit("side-bet:changed", { betId, reason });
   },
-  async walletChanged(userIds: string | string[], reason: string) {
+  async walletChanged(userIds: string | string[], reason: string, detail?: { creditsBalance: number; transaction: unknown }) {
     const ids = Array.isArray(userIds) ? userIds : [userIds];
     for (const userId of [...new Set(ids)]) {
-      io.to(`user:${userId}`).emit("wallet:changed", { reason });
+      io.to(`user:${userId}`).emit("wallet:changed", detail ? { reason, ...detail } : { reason });
     }
+  },
+  async coinFlipChanged() {
+    const state = await getCoinFlipState("");
+    io.to("coin-flip").emit("coin-flip:state", { ...state, myOption: null });
   },
   async adminChanged(reason: string) {
     io.to("admin").emit("admin:changed", { reason });
@@ -62,8 +66,16 @@ server.listen(config.port, "0.0.0.0", () => {
   console.log(`Coin flip listening on http://0.0.0.0:${config.port}`);
 });
 
+let publishedCoinFlip = "";
 setInterval(() => {
-  void settleDueCoinFlips(realtime).catch((error) => {
+  void (async () => {
+    await settleDueCoinFlips(realtime);
+    const state = await getCoinFlipState("");
+    const signature = `${state.startsAt}|${state.status}|${state.sideBetId}|${state.winningOptionId}|${state.counts.heads}|${state.counts.tails}|${state.counts.edge}`;
+    if (signature === publishedCoinFlip) return;
+    publishedCoinFlip = signature;
+    io.to("coin-flip").emit("coin-flip:state", { ...state, myOption: null });
+  })().catch((error) => {
     console.error("Coin flip settlement failed", error);
   });
 }, 2000);

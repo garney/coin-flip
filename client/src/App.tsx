@@ -14,7 +14,7 @@ import type {
   SideBet,
   SideBetDetail
 } from "../../shared/types";
-import { api } from "./api";
+import { api, type CoinFlipState } from "./api";
 import { CoinFlipPanel } from "./CoinFlipModal";
 import { supabase } from "./supabase";
 
@@ -93,9 +93,11 @@ export function App() {
   const [sideBetCommentBusy, setSideBetCommentBusy] = useState(false);
   const [view, setView] = useState<AppView>("side-bets");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [coinFlip, setCoinFlip] = useState<CoinFlipState | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const chatOpenRef = useRef(false);
+  const socketRef = useRef<Socket | null>(null);
 
   const activeBets = useMemo(() => sideBets.filter((bet) => bet.status === "open").length, [sideBets]);
   const creatableGroups = useMemo(() => {
@@ -314,19 +316,37 @@ export function App() {
       if (!data.session?.access_token) return;
 
       socket = io("/", { auth: { token: data.session.access_token } });
+      socketRef.current = socket;
       if (activeSideBetId) {
         socket.emit("side-bet:watch", { betId: activeSideBetId });
         socket.emit("chat:watch", { sideBetId: activeSideBetId });
       }
 
-      socket.on("side-bet:changed", (payload: { betId?: string }) => {
-        refreshSideBetList().catch((error) => setMessage(error.message));
+      socket.on("coin-flip:state", (next: CoinFlipState) => {
+        setCoinFlip((current) => ({
+          ...next,
+          myOption: next.myOption ?? (current?.startsAt === next.startsAt ? current.myOption : null)
+        }));
+      });
+
+      socket.on("side-bet:changed", (payload: { betId?: string; reason?: string }) => {
+        if (payload.reason === "settled" || payload.reason === "created") {
+          refreshSideBetList().catch((error) => setMessage(error.message));
+        }
         if (payload.betId && payload.betId === activeSideBetId) {
           refreshSelectedSideBet().catch((error) => setMessage(error.message));
         }
       });
 
-      socket.on("wallet:changed", () => {
+      socket.on("wallet:changed", (payload: { creditsBalance?: number; transaction?: CreditTransaction }) => {
+        if (typeof payload?.creditsBalance === "number") {
+          setProfile((current) => (current ? { ...current, creditsBalance: payload.creditsBalance ?? current.creditsBalance } : current));
+          const transaction = payload.transaction;
+          if (transaction) {
+            setTransactions((current) => (current.some((item) => item.id === transaction.id) ? current : [transaction, ...current]));
+          }
+          return;
+        }
         refreshWalletData().catch((error) => setMessage(error.message));
       });
 
@@ -361,9 +381,27 @@ export function App() {
         socket.emit("side-bet:unwatch", { betId: activeSideBetId });
         socket.emit("chat:unwatch", { sideBetId: activeSideBetId });
       }
+      socketRef.current = null;
       socket?.disconnect();
     };
   }, [profile?.isAdmin, refreshAdminData, refreshSelectedSideBet, refreshSideBetList, refreshWalletData, activeSideBetId, sessionState]);
+
+  const stakeCoinFlip = useCallback((optionId: "heads" | "tails" | "edge") => {
+    return new Promise<CoinFlipState>((resolve, reject) => {
+      const socket = socketRef.current;
+      if (!socket?.connected) {
+        reject(new Error("Not connected"));
+        return;
+      }
+      socket.timeout(20000).emit("coin-flip:stake", { optionId }, (error: Error | null, result?: { ok: boolean; state?: CoinFlipState; error?: string }) => {
+        if (error || !result?.ok || !result.state) {
+          reject(new Error(result?.error ?? error?.message ?? "Stake failed"));
+          return;
+        }
+        resolve(result.state);
+      });
+    });
+  }, []);
 
   async function signIn() {
     await supabase.auth.signInWithOAuth({
@@ -710,9 +748,8 @@ export function App() {
               creditRequests={creditRequests}
               onView={openSideBetPage}
               onAction={withAction}
-              onStaked={() => {
-                refreshWalletData().catch((error) => setMessage(error.message));
-              }}
+              coinFlip={coinFlip}
+              onStake={stakeCoinFlip}
             />
           ) : null}
           {selectedSideBetId ? (
@@ -904,7 +941,8 @@ function SideBetListView({
   creditRequests,
   onView,
   onAction,
-  onStaked
+  coinFlip,
+  onStake
 }: {
   activeBets: number;
   sideBets: SideBet[];
@@ -916,7 +954,8 @@ function SideBetListView({
   creditRequests: CreditRequest[];
   onView: (id: string) => void;
   onAction: (action: () => Promise<unknown>, success: string) => Promise<void>;
-  onStaked: () => void;
+  coinFlip: CoinFlipState | null;
+  onStake: (optionId: "heads" | "tails" | "edge") => Promise<CoinFlipState>;
 }) {
   const settled = sideBets.filter((bet) => bet.status === "settled").slice(0, 30);
 
@@ -955,7 +994,7 @@ function SideBetListView({
         </aside>
 
         <div className="main-column">
-          <CoinFlipPanel page onStaked={onStaked} />
+          <CoinFlipPanel page live={coinFlip} onStake={onStake} />
         </div>
 
         <aside className="create-panel">

@@ -1,8 +1,22 @@
 import { supabaseAdmin } from "./supabase.js";
 
+type WalletDetail = {
+  creditsBalance: number;
+  transaction: {
+    id: string;
+    userId: string;
+    amountCredits: number;
+    kind: "deposit" | "withdrawal" | "adjustment" | "buy_in" | "payout" | "fee";
+    description: string;
+    sideBetId: string | null;
+    createdAt: string;
+  };
+};
+
 type RealtimeNotifier = {
   sideBetChanged: (betId: string, reason: string) => Promise<void>;
-  walletChanged: (userIds: string | string[], reason: string) => Promise<void>;
+  walletChanged: (userIds: string | string[], reason: string, detail?: WalletDetail) => Promise<void>;
+  coinFlipChanged: () => Promise<void>;
 };
 
 /** Diaconis, Holmes, Montgomery: caught flip lands the starting face about 51% of the time. */
@@ -103,25 +117,67 @@ export async function getCoinFlipState(userId: string) {
   };
 }
 
+function coinFlipPayload(input: {
+  startsAt: string;
+  closesAt: string;
+  startFace: CoinFace;
+  sideBetId: string | null;
+  status: string;
+  winningOptionId: string | null;
+  counts: { heads: number; tails: number; edge: number };
+  myOption: string | null;
+}) {
+  return {
+    buyInCredits: COIN_FLIP_BUY_IN,
+    ...input,
+    model: {
+      sameFaceProbability: SAME_FACE_PROBABILITY,
+      edgeProbability: EDGE_PROBABILITY,
+      note: "Same-face bias from Diaconis, Holmes, and Montgomery. Edge rate from Murray and Teare for a nickel landing on a surface."
+    }
+  };
+}
+
+function countEntries(entries: { user_id: string; option_id: string }[], userId: string) {
+  const counts = { heads: 0, tails: 0, edge: 0 };
+  let myOption: string | null = null;
+  for (const entry of entries) {
+    const option = entry.option_id as CoinOutcome;
+    if (option === "heads" || option === "tails" || option === "edge") counts[option] += 1;
+    if (entry.user_id === userId) myOption = entry.option_id;
+  }
+  return { counts, myOption };
+}
+
 export async function stakeCoinFlip(userId: string, optionId: CoinOutcome, realtime: RealtimeNotifier) {
   if (optionId !== "heads" && optionId !== "tails" && optionId !== "edge") {
     throw new Error("Pick heads, tails, or edge");
   }
 
   const window = currentWindow();
-    if (Date.now() >= new Date(window.closesAt).getTime() - 10_000) {
-      throw new Error("Bets are locked for the last 10 seconds");
-    }
-
-  let bet = await findWindowBet(window.startsAt);
-  if (bet && bet.status !== "open") {
-    throw new Error("This flip is already settled");
+  const startFace = startFaceForWindow(window.startsMs);
+  if (Date.now() >= new Date(window.closesAt).getTime() - 10_000) {
+    throw new Error("Bets are locked for the last 10 seconds");
   }
 
+  const [betResult, profileResult] = await Promise.all([
+    supabaseAdmin
+      .from("side_bets")
+      .select("id, status, starts_at, closes_at, winning_option_id, options, bet_entries(user_id, option_id)")
+      .eq("source_url", COIN_FLIP_SOURCE)
+      .eq("starts_at", window.startsAt)
+      .maybeSingle(),
+    supabaseAdmin.from("profiles").select("credits_balance").eq("id", userId).single()
+  ]);
+  if (betResult.error) throw new Error(betResult.error.message);
+  if (profileResult.error || !profileResult.data) throw new Error("Profile not found");
+
+  let bet = betResult.data;
+  if (bet && bet.status !== "open") throw new Error("This flip is already settled");
+
   if (!bet) {
-    const startFace = startFaceForWindow(window.startsMs);
     const label = new Date(window.startsMs).toISOString().slice(11, 16);
-    const { data, error } = await supabaseAdmin
+    const created = await supabaseAdmin
       .from("side_bets")
       .insert({
         manager_id: userId,
@@ -136,39 +192,46 @@ export async function stakeCoinFlip(userId: string, optionId: CoinOutcome, realt
       })
       .select("id, status, starts_at, closes_at, winning_option_id, options")
       .single();
-
-    if (error) {
-      bet = await findWindowBet(window.startsAt);
-      if (!bet) throw new Error(error.message);
+    if (created.error || !created.data) {
+      const existing = await findWindowBet(window.startsAt);
+      if (!existing) throw new Error(created.error?.message ?? "Could not open the coin flip");
+      bet = { ...existing, bet_entries: [] };
     } else {
-      bet = data as FlipRow;
-      await realtime.sideBetChanged(bet.id, "created");
+      bet = { ...created.data, bet_entries: [] };
     }
   }
 
-  const { data: existing } = await supabaseAdmin
-    .from("bet_entries")
-    .select("id, option_id")
-    .eq("side_bet_id", bet.id)
-    .eq("user_id", userId)
-    .maybeSingle();
+  const entries = (bet.bet_entries ?? []) as { user_id: string; option_id: string }[];
+  const tallied = countEntries(entries, userId);
+  const snapshot = (counts: typeof tallied.counts, myOption: string | null) =>
+    coinFlipPayload({
+      startsAt: window.startsAt,
+      closesAt: window.closesAt,
+      startFace,
+      sideBetId: bet.id,
+      status: bet.status,
+      winningOptionId: bet.winning_option_id,
+      counts,
+      myOption
+    });
 
-  if (existing) {
-    if (existing.option_id !== optionId) {
-      const { error } = await supabaseAdmin.from("bet_entries").update({ option_id: optionId }).eq("id", existing.id);
-      if (error) throw new Error(error.message);
-      await realtime.sideBetChanged(bet.id, "entry-changed");
-    }
-    return getCoinFlipState(userId);
+  if (tallied.myOption === optionId) return snapshot(tallied.counts, optionId);
+
+  if (tallied.myOption) {
+    const previous = tallied.myOption as CoinOutcome;
+    const { error } = await supabaseAdmin
+      .from("bet_entries")
+      .update({ option_id: optionId })
+      .eq("side_bet_id", bet.id)
+      .eq("user_id", userId);
+    if (error) throw new Error(error.message);
+    tallied.counts[previous] = Math.max(0, tallied.counts[previous] - 1);
+    tallied.counts[optionId] += 1;
+    void realtime.coinFlipChanged();
+    return snapshot(tallied.counts, optionId);
   }
 
-  const { data: profile, error: profileError } = await supabaseAdmin
-    .from("profiles")
-    .select("credits_balance")
-    .eq("id", userId)
-    .single();
-  if (profileError || !profile) throw new Error("Profile not found");
-  if (Number(profile.credits_balance) < COIN_FLIP_BUY_IN) throw new Error("Not enough credits");
+  if (Number(profileResult.data.credits_balance) < COIN_FLIP_BUY_IN) throw new Error("Not enough credits");
 
   const { error: entryError } = await supabaseAdmin.from("bet_entries").insert({
     side_bet_id: bet.id,
@@ -178,22 +241,41 @@ export async function stakeCoinFlip(userId: string, optionId: CoinOutcome, realt
   });
   if (entryError) throw new Error(entryError.message);
 
-  await supabaseAdmin
-    .from("profiles")
-    .update({ credits_balance: Number(profile.credits_balance) - COIN_FLIP_BUY_IN })
-    .eq("id", userId);
-  await supabaseAdmin.from("credit_transactions").insert({
-    user_id: userId,
-    amount_credits: -COIN_FLIP_BUY_IN,
-    kind: "buy_in",
-    description: `Buy-in for coin flip`,
-    side_bet_id: bet.id,
-    created_by: userId
-  });
+  const nextBalance = Number(profileResult.data.credits_balance) - COIN_FLIP_BUY_IN;
+  const [balanceResult, transactionResult] = await Promise.all([
+    supabaseAdmin.from("profiles").update({ credits_balance: nextBalance }).eq("id", userId),
+    supabaseAdmin
+      .from("credit_transactions")
+      .insert({
+        user_id: userId,
+        amount_credits: -COIN_FLIP_BUY_IN,
+        kind: "buy_in",
+        description: "Buy-in for coin flip",
+        side_bet_id: bet.id,
+        created_by: userId
+      })
+      .select("id, created_at")
+      .single()
+  ]);
+  if (balanceResult.error) throw new Error(balanceResult.error.message);
+  if (transactionResult.error || !transactionResult.data) throw new Error(transactionResult.error?.message ?? "Could not record the stake");
 
-  await realtime.sideBetChanged(bet.id, "joined");
-  await realtime.walletChanged(userId, "buy-in");
-  return getCoinFlipState(userId);
+  const transaction = transactionResult.data;
+  void realtime.walletChanged(userId, "buy-in", {
+    creditsBalance: nextBalance,
+    transaction: {
+      id: transaction.id,
+      userId,
+      amountCredits: -COIN_FLIP_BUY_IN,
+      kind: "buy_in",
+      description: "Buy-in for coin flip",
+      sideBetId: bet.id,
+      createdAt: transaction.created_at
+    }
+  });
+  void realtime.coinFlipChanged();
+  tallied.counts[optionId] += 1;
+  return snapshot(tallied.counts, optionId);
 }
 
 export async function settleDueCoinFlips(realtime: RealtimeNotifier) {
@@ -226,18 +308,36 @@ export async function settleDueCoinFlips(realtime: RealtimeNotifier) {
       const amount = refunds ? Number(entry.stake_credits) : pot / winners.length;
       const { data: profile } = await supabaseAdmin.from("profiles").select("credits_balance").eq("id", entry.user_id).single();
       if (!profile) continue;
-      await supabaseAdmin
-        .from("profiles")
-        .update({ credits_balance: Number(profile.credits_balance) + amount })
-        .eq("id", entry.user_id);
-      await supabaseAdmin.from("credit_transactions").insert({
-        user_id: entry.user_id,
-        amount_credits: amount,
-        kind: refunds ? "adjustment" : "payout",
-        description: refunds ? `Coin flip refund (${winningOptionId}, no winners)` : `Coin flip payout (${winningOptionId})`,
-        side_bet_id: row.id,
-        created_by: entry.user_id
-      });
+      const nextBalance = Number(profile.credits_balance) + amount;
+      const description = refunds ? `Coin flip refund (${winningOptionId}, no winners)` : `Coin flip payout (${winningOptionId})`;
+      const kind = refunds ? "adjustment" : "payout";
+      await supabaseAdmin.from("profiles").update({ credits_balance: nextBalance }).eq("id", entry.user_id);
+      const { data: transaction } = await supabaseAdmin
+        .from("credit_transactions")
+        .insert({
+          user_id: entry.user_id,
+          amount_credits: amount,
+          kind,
+          description,
+          side_bet_id: row.id,
+          created_by: entry.user_id
+        })
+        .select("id, created_at")
+        .single();
+      if (transaction) {
+        await realtime.walletChanged(entry.user_id, refunds ? "refund" : "settlement", {
+          creditsBalance: nextBalance,
+          transaction: {
+            id: transaction.id,
+            userId: entry.user_id,
+            amountCredits: amount,
+            kind,
+            description,
+            sideBetId: row.id,
+            createdAt: transaction.created_at
+          }
+        });
+      }
     }
 
     await supabaseAdmin
@@ -251,9 +351,6 @@ export async function settleDueCoinFlips(realtime: RealtimeNotifier) {
       .eq("status", "open");
 
     await realtime.sideBetChanged(row.id, "settled");
-    await realtime.walletChanged(
-      paid.map((entry) => entry.user_id),
-      refunds ? "refund" : "settlement"
-    );
+    await realtime.coinFlipChanged();
   }
 }
