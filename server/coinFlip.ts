@@ -11,7 +11,7 @@ export const SAME_FACE_PROBABILITY = 0.51;
 export const EDGE_PROBABILITY = 1 / 6000;
 export const COIN_FLIP_SOURCE = "sidebets:coin-flip";
 export const COIN_FLIP_BUY_IN = 1;
-export const WINDOW_MS = 3 * 60 * 1000;
+export const WINDOW_MS = 60 * 1000;
 
 export type CoinFace = "heads" | "tails";
 export type CoinOutcome = CoinFace | "edge";
@@ -219,22 +219,24 @@ export async function settleDueCoinFlips(realtime: RealtimeNotifier) {
 
     const winners = list.filter((entry) => entry.option_id === winningOptionId);
     const pot = list.reduce((total, entry) => total + Number(entry.stake_credits), 0);
-    const payout = winners.length > 0 ? pot / winners.length : 0;
+    const refunds = winners.length === 0;
+    const paid = refunds ? list : winners;
 
-    for (const winner of winners) {
-      const { data: profile } = await supabaseAdmin.from("profiles").select("credits_balance").eq("id", winner.user_id).single();
+    for (const entry of paid) {
+      const amount = refunds ? Number(entry.stake_credits) : pot / winners.length;
+      const { data: profile } = await supabaseAdmin.from("profiles").select("credits_balance").eq("id", entry.user_id).single();
       if (!profile) continue;
       await supabaseAdmin
         .from("profiles")
-        .update({ credits_balance: Number(profile.credits_balance) + payout })
-        .eq("id", winner.user_id);
+        .update({ credits_balance: Number(profile.credits_balance) + amount })
+        .eq("id", entry.user_id);
       await supabaseAdmin.from("credit_transactions").insert({
-        user_id: winner.user_id,
-        amount_credits: payout,
-        kind: "payout",
-        description: `Coin flip payout (${winningOptionId})`,
+        user_id: entry.user_id,
+        amount_credits: amount,
+        kind: refunds ? "adjustment" : "payout",
+        description: refunds ? `Coin flip refund (${winningOptionId}, no winners)` : `Coin flip payout (${winningOptionId})`,
         side_bet_id: row.id,
-        created_by: winner.user_id
+        created_by: entry.user_id
       });
     }
 
@@ -250,8 +252,8 @@ export async function settleDueCoinFlips(realtime: RealtimeNotifier) {
 
     await realtime.sideBetChanged(row.id, "settled");
     await realtime.walletChanged(
-      winners.map((winner) => winner.user_id),
-      "settlement"
+      paid.map((entry) => entry.user_id),
+      refunds ? "refund" : "settlement"
     );
   }
 }

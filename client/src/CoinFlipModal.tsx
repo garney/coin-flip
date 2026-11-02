@@ -39,12 +39,13 @@ type Shot = {
   style: LandingStyle;
 };
 
-export function CoinFlipPanel({ page = false }: { page?: boolean }) {
+export function CoinFlipPanel({ page = false, onStaked }: { page?: boolean; onStaked?: () => void }) {
   const [open, setOpen] = useState(page);
   const [state, setState] = useState<CoinFlipState | null>(null);
   const [error, setError] = useState("");
   const [shot, setShot] = useState<Shot | null>(null);
   const [caption, setCaption] = useState("Waiting for the window.");
+  const [staking, setStaking] = useState<Face | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const playedWindow = useRef<string | null>(null);
   const picked = useRef<Face | null>(null);
@@ -86,23 +87,19 @@ export function CoinFlipPanel({ page = false }: { page?: boolean }) {
   }, [open, page]);
 
   async function stake(optionId: Face) {
+    if (staking) return;
     setError("");
-    picked.current = optionId;
-    setState((current) => {
-      if (!current) return current;
-      const previous = current.myOption as Face | null;
-      const counts = { ...current.counts };
-      if (previous && previous !== optionId) counts[previous] = Math.max(0, counts[previous] - 1);
-      if (previous !== optionId) counts[optionId] += 1;
-      return { ...current, myOption: optionId, counts };
-    });
-    setCaption(`You picked ${optionId}. 1 credit.`);
+    setStaking(optionId);
     try {
       const next = await api.stakeCoinFlip(optionId);
       picked.current = (next.myOption as Face | null) ?? optionId;
       setState(next);
+      setCaption(`You picked ${optionId}. 1 credit.`);
+      onStaked?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Stake failed");
+    } finally {
+      setStaking(null);
     }
   }
 
@@ -169,14 +166,16 @@ export function CoinFlipPanel({ page = false }: { page?: boolean }) {
             <div className="coin-stakes">
               {(["heads", "tails", "edge"] as Face[]).map((face) => {
                 const selected = state?.myOption === face;
+                const busy = staking === face;
                 return (
                   <button
                     key={face}
                     type="button"
                     className={selected ? "coin-choice is-selected" : "coin-choice"}
-                    disabled={!betting}
+                    disabled={!betting || staking !== null}
                     onClick={() => void stake(face)}
                   >
+                    {busy ? <span className="coin-choice-spinner" aria-label="Saving pick" /> : null}
                     <span>{face}</span>
                     <strong>{state?.counts[face] ?? 0}</strong>
                     {selected ? <em>Selected</em> : <em>1 credit</em>}

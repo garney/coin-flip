@@ -1506,6 +1506,21 @@ textarea:focus {
   color: #d7ebe4;
 }
 
+.coin-choice-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #e4dccb;
+  border-top-color: #1f6b4a;
+  border-radius: 50%;
+  animation: coin-spin 0.7s linear infinite;
+}
+
+@keyframes coin-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .coin-choice:disabled {
   opacity: 0.55;
 }

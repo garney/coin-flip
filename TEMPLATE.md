@@ -133,7 +133,7 @@ The free service sleeps when idle. The first request after sleep is slow. The co
 - `http://localhost:4123` opens the app and Google sign-in returns to the app.
 - A signed-in user sees the live coin in the middle, settled flips on the left, and credit request and redeem on the right.
 - Staking 1 credit creates a row. If nobody stakes, the window ends with no row.
-- Windows are 3 minutes, aligned to the clock (`WINDOW_MS` in `server/coinFlip.ts`). Bets lock for the last 10 seconds. At `0:00` the toss animation plays.
+- Windows are 1 minute, aligned to the clock (`WINDOW_MS` in `server/coinFlip.ts`). Bets lock for the last 10 seconds. At `0:00` the toss animation plays.
 - The Render URL loads the same app and sign-in works there too.
 
 ## Agent checklist

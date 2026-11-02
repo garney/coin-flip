@@ -667,6 +667,9 @@ export function App() {
               creditRequests={creditRequests}
               onView={openSideBetPage}
               onAction={withAction}
+              onStaked={() => {
+                refreshWalletData().catch((error) => setMessage(error.message));
+              }}
             />
           ) : null}
           {selectedSideBetId ? (
@@ -857,7 +860,8 @@ function SideBetListView({
   redemptions,
   creditRequests,
   onView,
-  onAction
+  onAction,
+  onStaked
 }: {
   activeBets: number;
   sideBets: SideBet[];
@@ -869,6 +873,7 @@ function SideBetListView({
   creditRequests: CreditRequest[];
   onView: (id: string) => void;
   onAction: (action: () => Promise<unknown>, success: string) => Promise<void>;
+  onStaked: () => void;
 }) {
   const settled = sideBets.filter((bet) => bet.status === "settled").slice(0, 30);
 
@@ -907,7 +912,7 @@ function SideBetListView({
         </aside>
 
         <div className="main-column">
-          <CoinFlipPanel page />
+          <CoinFlipPanel page onStaked={onStaked} />
         </div>
 
         <aside className="create-panel">
