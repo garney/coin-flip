@@ -59,6 +59,8 @@ if (config.nodeEnv === "production") {
     appType: "spa",
     root: path.resolve(process.cwd(), "client")
   });
+  // Dev-only coin test bench. Production serves client/dist, which never contains it.
+  app.get(/^\/dev\/coin$/, (_req, res) => res.redirect("/dev/coin/"));
   app.use(vite.middlewares);
 }
 
@@ -71,7 +73,7 @@ setInterval(() => {
   void (async () => {
     await settleDueCoinFlips(realtime);
     const state = await getCoinFlipState("");
-    const signature = `${state.startsAt}|${state.status}|${state.sideBetId}|${state.winningOptionId}|${state.counts.heads}|${state.counts.tails}|${state.counts.edge}`;
+    const signature = `${state.startsAt}|${state.status}|${state.sideBetId}|${state.winningOptionId}|${state.counts.heads}|${state.counts.tails}|${state.counts.edge}|${state.previous.winningOptionId}|${state.result}`;
     if (signature === publishedCoinFlip) return;
     publishedCoinFlip = signature;
     io.to("coin-flip").emit("coin-flip:state", { ...state, myOption: null });

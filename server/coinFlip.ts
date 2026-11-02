@@ -1,3 +1,5 @@
+import { createHmac } from "node:crypto";
+import { config } from "./config.js";
 import { supabaseAdmin } from "./supabase.js";
 
 type WalletDetail = {
@@ -57,6 +59,27 @@ export function sampleCoinOutcome(startFace: CoinFace, random = Math.random): Co
   return startFace === "heads" ? "tails" : "heads";
 }
 
+/** Bets lock this long before the close. The result is revealed from then on. */
+export const LOCK_MS = 10_000;
+
+/**
+ * The result for a window, fixed in advance but secret. It is a keyed hash of
+ * the window start, run through the same odds as before, so it can be revealed
+ * when bets lock (letting every browser flick exactly at the close) and the
+ * settlement later uses the same value. Stakes are refused once bets lock, so
+ * knowing the result then gives no edge.
+ */
+export function outcomeForWindow(startsMs: number): CoinOutcome {
+  const digest = createHmac("sha256", config.coinFlipSecret).update(`coin-flip:${new Date(startsMs).toISOString()}`).digest();
+  const roll = digest.readUIntBE(0, 6) / 2 ** 48;
+  return sampleCoinOutcome(startFaceForWindow(startsMs), () => roll);
+}
+
+/** The window's result once bets have locked, otherwise null. */
+function revealedOutcome(startsMs: number, now = Date.now()) {
+  return now >= startsMs + WINDOW_MS - LOCK_MS ? outcomeForWindow(startsMs) : null;
+}
+
 type FlipRow = {
   id: string;
   status: string;
@@ -86,7 +109,10 @@ async function findWindowBet(startsAt: string) {
 export async function getCoinFlipState(userId: string) {
   const window = currentWindow();
   const startFace = startFaceForWindow(window.startsMs);
-  const bet = await findWindowBet(window.startsAt);
+  const previousStartsMs = window.startsMs - WINDOW_MS;
+  const previousStartsAt = new Date(previousStartsMs).toISOString();
+  // The window that just closed, so clients can play its result after rolling over.
+  const [bet, previousBet] = await Promise.all([findWindowBet(window.startsAt), findWindowBet(previousStartsAt)]);
   let counts = { heads: 0, tails: 0, edge: 0 };
   let myOption: string | null = null;
 
@@ -115,6 +141,16 @@ export async function getCoinFlipState(userId: string) {
     winningOptionId: bet?.winning_option_id ?? null,
     counts,
     myOption,
+    result: revealedOutcome(window.startsMs),
+    previous: {
+      startsAt: previousStartsAt,
+      closesAt: window.startsAt,
+      startFace: startFaceForWindow(previousStartsMs),
+      sideBetId: previousBet?.id ?? null,
+      status: previousBet?.status ?? "no-stakes",
+      winningOptionId: (previousBet?.winning_option_id as CoinOutcome | null | undefined) ?? null,
+      result: outcomeForWindow(previousStartsMs)
+    },
     model: {
       sameFaceProbability: SAME_FACE_PROBABILITY,
       edgeProbability: EDGE_PROBABILITY,
@@ -162,7 +198,7 @@ export async function stakeCoinFlip(userId: string, optionId: CoinOutcome, realt
 
   const window = currentWindow();
   const startFace = startFaceForWindow(window.startsMs);
-  if (Date.now() >= new Date(window.closesAt).getTime() - 10_000) {
+  if (Date.now() >= new Date(window.closesAt).getTime() - LOCK_MS) {
     throw new Error("Bets are locked for the last 10 seconds");
   }
 
@@ -294,8 +330,8 @@ export async function settleDueCoinFlips(realtime: RealtimeNotifier) {
 
   for (const row of due) {
     const startsMs = new Date(row.starts_at).getTime();
-    const startFace = startFaceForWindow(startsMs);
-    const winningOptionId = sampleCoinOutcome(startFace);
+    // The same result that was revealed when bets locked.
+    const winningOptionId = outcomeForWindow(startsMs);
     const { data: entries } = await supabaseAdmin.from("bet_entries").select("*").eq("side_bet_id", row.id);
     const list = entries ?? [];
     if (list.length === 0) {

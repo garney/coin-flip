@@ -14,9 +14,13 @@ export default [
     languageOptions: {
       parser: tsParser,
       globals: {
+        AudioContext: "readonly",
+        AudioNode: "readonly",
+        CanvasRenderingContext2D: "readonly",
         console: "readonly",
         document: "readonly",
         fetch: "readonly",
+        PointerEvent: "readonly",
         process: "readonly",
         RequestInit: "readonly",
         window: "readonly"

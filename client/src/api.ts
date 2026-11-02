@@ -183,5 +183,17 @@ export type CoinFlipState = {
   winningOptionId: "heads" | "tails" | "edge" | null;
   counts: { heads: number; tails: number; edge: number };
   myOption: string | null;
+  /** This window's result, revealed once bets lock so the flip can start right at the close. */
+  result?: "heads" | "tails" | "edge" | null;
+  /** The window that just closed. Missing on stake replies. */
+  previous?: {
+    startsAt: string;
+    closesAt: string;
+    startFace: "heads" | "tails";
+    sideBetId: string | null;
+    status: string;
+    winningOptionId: "heads" | "tails" | "edge" | null;
+    result?: "heads" | "tails" | "edge";
+  };
   model: { sameFaceProbability: number; edgeProbability: number; note: string };
 };

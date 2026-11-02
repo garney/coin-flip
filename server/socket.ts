@@ -1,12 +1,12 @@
 import type { Server as HttpServer } from "node:http";
 import { Server } from "socket.io";
-import { getCoinFlipState, type CoinOutcome } from "./coinFlip.js";
+import { getCoinFlipState, type CoinOutcome, type stakeCoinFlip } from "./coinFlip.js";
 import { config } from "./config.js";
 import { supabaseAdmin, supabaseAuth } from "./supabase.js";
 
 export function createSocketServer(
   httpServer: HttpServer,
-  stake: (userId: string, optionId: CoinOutcome) => Promise<Awaited<ReturnType<typeof getCoinFlipState>>>
+  stake: (userId: string, optionId: CoinOutcome) => ReturnType<typeof stakeCoinFlip>
 ) {
   const io = new Server(httpServer, {
     cors: {

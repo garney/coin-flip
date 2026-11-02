@@ -1525,6 +1525,16 @@ textarea:focus {
   align-items: center;
 }
 
+.coin-modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.coin-sound-toggle[aria-pressed="false"] {
+  opacity: 0.6;
+}
+
 .coin-countdown {
   display: flex;
   flex-direction: column;
@@ -1552,10 +1562,23 @@ textarea:focus {
 
 .coin-canvas {
   width: 100%;
-  height: 240px;
+  height: clamp(260px, 52vw, 360px);
   display: block;
+  overflow: hidden;
   border-radius: 12px;
-  background: #f4f1eb;
+  background: radial-gradient(ellipse at 50% 30%, #3a4640 0%, #1d2521 75%);
+  /* Horizontal drags spin the coin; vertical swipes still scroll the page. */
+  touch-action: pan-y;
+}
+
+.coin-canvas-loading {
+  animation: coin-canvas-pulse 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes coin-canvas-pulse {
+  to {
+    opacity: 0.7;
+  }
 }
 
 .coin-notes {
@@ -1632,4 +1655,134 @@ textarea:focus {
 
 .coin-choice:disabled {
   opacity: 0.55;
+}
+
+/* ---- Coin lab (dev only, /dev/coin/) ---- */
+
+.coin-lab {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+  display: grid;
+  gap: 24px;
+}
+
+.coin-lab-header h1 {
+  margin: 0 0 4px;
+}
+
+.coin-lab-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 20px;
+  align-items: start;
+}
+
+.coin-lab-controls {
+  display: grid;
+  gap: 16px;
+}
+
+.coin-lab-controls section,
+.coin-lab-scene {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #1c1915;
+}
+
+.coin-lab-controls h2,
+.coin-lab-scene h2 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.coin-lab-controls label {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.coin-lab-row,
+.coin-lab-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.coin-lab-controls .coin-lab-check,
+.coin-lab-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.coin-lab-chip {
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid #d6cfc4;
+  background: #ffffff;
+  color: #1c1915;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.coin-lab-chip.is-on {
+  background: #1c1915;
+  border-color: #1c1915;
+  color: #ffffff;
+}
+
+.coin-lab-readout {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.coin-lab-readout dt {
+  color: #6b645b;
+}
+
+.coin-lab-readout dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.coin-lab-log {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: #6b645b;
+  max-height: 220px;
+  overflow: auto;
+}
+
+@media (max-width: 860px) {
+  .coin-lab-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.coin-lab-check input {
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  flex: none;
+}
+
+.coin-lab-row > button {
+  width: auto;
+}
+
+.coin-lab-stage .coin-canvas {
+  height: clamp(260px, 40vw, 420px);
 }
