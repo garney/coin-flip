@@ -157,12 +157,6 @@ export function CoinFlipPanel({ page = false, onStaked }: { page?: boolean; onSt
             <CoinCanvas shot={shot} restFace={state?.startFace ?? "heads"} />
             <Countdown remainingMs={closesIn} />
             <p className="muted">{caption}</p>
-            <p className="muted">
-              Stake is 1 credit. Bets lock with 10 seconds left. A coin flip is saved only after someone stakes.
-            </p>
-            <p className="muted">
-              Starts {state?.startFace ?? "…"}. Same face about 51% (Diaconis). Edge about 1 in 6,000 (Murray and Teare).
-            </p>
             <div className="coin-stakes">
               {(["heads", "tails", "edge"] as Face[]).map((face) => {
                 const selected = state?.myOption === face;
@@ -182,6 +176,10 @@ export function CoinFlipPanel({ page = false, onStaked }: { page?: boolean; onSt
                   </button>
                 );
               })}
+            </div>
+            <div className="coin-notes">
+              <p className="muted">Stake is 1 credit. Bets lock with 10 seconds left. A coin flip is saved only after someone stakes.</p>
+              <p className="muted">Starts {state?.startFace ?? "…"}. Same face about 51% (Diaconis). Edge about 1 in 6,000 (Murray and Teare).</p>
             </div>
             {state?.winningOptionId ? <p>Landed on {state.winningOptionId}.</p> : null}
             {!state?.sideBetId && !betting ? <p className="muted">No stakes this round, so nothing was recorded.</p> : null}

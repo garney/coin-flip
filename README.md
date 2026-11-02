@@ -378,13 +378,21 @@ ADMIN_USER_IDS=comma-separated-admin-user-ids
 
 `VITE_*` values are needed during the Render build because the React app is compiled before the server starts.
 
-### Supabase URLs for Render
+### Custom domain
 
-After Render creates the service, it will give you a URL like:
+The public site is `https://coinflip.amongfriends.net`. Render also serves `https://coin-flip-6uhv.onrender.com`.
+
+In Render, add `coinflip.amongfriends.net` under **Settings → Custom Domains**.
+
+In Cloudflare, on `amongfriends.net`, add a DNS-only CNAME:
 
 ```text
-https://coin-flip.onrender.com
+coinflip  CNAME  coin-flip-6uhv.onrender.com
 ```
+
+Keep the Cloudflare proxy off (grey cloud) so Render can issue the certificate.
+
+### Supabase URLs
 
 In Supabase, go to:
 
@@ -395,9 +403,9 @@ Authentication -> URL Configuration
 Set or add:
 
 ```text
-Site URL: https://coin-flip.onrender.com
-Redirect URL: https://coin-flip.onrender.com
-Redirect URL: https://coin-flip.onrender.com/auth/callback
+Site URL: https://coinflip.amongfriends.net
+Redirect URL: https://coinflip.amongfriends.net
+Redirect URL: https://coinflip.amongfriends.net/auth/callback
 ```
 
 Keep the local URLs too if you still want local development:

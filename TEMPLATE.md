@@ -100,7 +100,7 @@ Redirect URLs:
   http://localhost:4123/auth/callback
 ```
 
-After Render exists, add the public origin as well, for example `https://coin-flip.onrender.com` and `https://coin-flip.onrender.com/auth/callback`. The Site URL can stay on localhost while you are developing, or move to the Render URL once that is the place people sign in.
+After the public hostname exists, add it as well. For this app that is `https://coinflip.amongfriends.net` and `https://coinflip.amongfriends.net/auth/callback`. Set the Site URL to that hostname once people sign in there. Keep the localhost URLs for local development.
 
 7. Restart `npm run dev` and sign in with Google once. In Supabase, open **Authentication → Users**, copy that user's UUID, and set `ADMIN_USER_IDS` in `.env` to it if that person should open the admin centre. Restart the server after changing it.
 
@@ -123,18 +123,41 @@ ADMIN_USER_IDS
 
 `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are compiled into the browser bundle while the image builds. Changing either value requires a new deploy, not only a restart.
 
-4. Wait until the deploy is live and `/api/health` returns `{"ok":true}`.
-5. Add that `https://<service>.onrender.com` origin to the Supabase redirect URLs from step 3.
+4. Wait until the deploy is live and `https://<service>.onrender.com/api/health` returns `{"ok":true}`. This copy is `https://coin-flip-6uhv.onrender.com`.
 
 The free service sleeps when idle. The first request after sleep is slow. The coin-flip timer runs only while the process is awake.
 
-## 5. Check that the copy works
+## 5. Custom domain
+
+The public site is `https://coinflip.amongfriends.net`. DNS is on Cloudflare for `amongfriends.net`. The Google OAuth redirect stays the Supabase callback. Only Supabase and Render need this hostname.
+
+1. In Render, open the service **Settings → Custom Domains** and add `coinflip.amongfriends.net`.
+2. In Cloudflare, open **amongfriends.net → DNS → Records** and add:
+
+| Type | Name | Target | Proxy |
+|---|---|---|---|
+| CNAME | `coinflip` | `coin-flip-6uhv.onrender.com` | DNS only (grey cloud) |
+
+Leave the Cloudflare proxy off. Render issues the certificate, and the orange cloud blocks that. A new copy uses its own Render hostname as the CNAME target.
+
+3. In Supabase **Authentication → URL Configuration**, set:
+
+```text
+Site URL: https://coinflip.amongfriends.net
+Redirect URLs:
+  https://coinflip.amongfriends.net
+  https://coinflip.amongfriends.net/auth/callback
+  http://localhost:4123
+  http://localhost:4123/auth/callback
+```
+
+## 6. Check that the copy works
 
 - `http://localhost:4123` opens the app and Google sign-in returns to the app.
 - A signed-in user sees the live coin in the middle, settled flips on the left, and credit request and redeem on the right.
 - Staking 1 credit creates a row. If nobody stakes, the window ends with no row.
 - Windows are 1 minute, aligned to the clock (`WINDOW_MS` in `server/coinFlip.ts`). Bets lock for the last 10 seconds. At `0:00` the toss animation plays.
-- The Render URL loads the same app and sign-in works there too.
+- `https://coinflip.amongfriends.net` loads the same app and Google sign-in returns there.
 
 ## Agent checklist
 
@@ -151,7 +174,8 @@ Render service name: <name>
 2. Create or use the Supabase project. Write .env from .env.example with new keys. Never print the service role key.
 3. Ask the user to run `npx supabase login` if the CLI is not logged in, then `npx supabase link --project-ref <ref>` and `npx supabase db push`. Confirm migrations 0001-0006 are on the remote.
 4. Tell the user to create a Google Cloud OAuth consent screen and a Web client whose only redirect is https://<ref>.supabase.co/auth/v1/callback. They paste the client id and secret into Supabase → Authentication → Providers → Google.
-5. Set Supabase Site URL and redirect URLs for http://localhost:4123 and, after deploy, the Render origin.
+5. Set Supabase Site URL and redirect URLs for http://localhost:4123 and for the public hostname.
 6. Push main. In Render, create a Blueprint from render.yaml and set the six env vars. Remind them that VITE_* changes need a rebuild.
-7. After the first Google login, put that user's UUID in ADMIN_USER_IDS locally and on Render if they should be an admin.
+7. In Cloudflare DNS for the domain, add a grey-cloud CNAME from the hostname to the Render service. In Render, add that hostname under Custom Domains.
+8. After the first Google login, put that user's UUID in ADMIN_USER_IDS locally and on Render if they should be an admin.
 ```

@@ -143,6 +143,11 @@ button:disabled {
   justify-content: flex-end;
 }
 
+.nav-menu-button,
+.nav-menu {
+  display: none;
+}
+
 .view-switch {
   gap: 4px;
   padding: 4px;
@@ -1256,11 +1261,51 @@ textarea:focus {
   .create-panel {
     grid-template-columns: 1fr;
   }
+
+  .view-switch,
+  .sign-out-button {
+    display: none;
+  }
+
+  .nav-menu-button {
+    display: inline-flex;
+  }
+
+  .topbar {
+    align-items: center;
+    flex-direction: row;
+  }
 }
 
 @media (max-width: 720px) {
   .app-shell {
     padding: 12px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .workspace {
+    display: contents;
+  }
+
+  .topbar {
+    order: 0;
+  }
+
+  .main-column {
+    order: 1;
+  }
+
+  .metrics {
+    order: 2;
+  }
+
+  .filters {
+    order: 3;
+  }
+
+  .create-panel {
+    order: 4;
   }
 
   .topbar,
@@ -1270,8 +1315,58 @@ textarea:focus {
   }
 
   .topbar {
-    align-items: flex-start;
-    flex-direction: column;
+    align-items: center;
+    flex-direction: row;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+
+  .brand-logo {
+    width: 120px;
+    height: 32px;
+  }
+
+  .view-switch,
+  .sign-out-button {
+    display: none;
+  }
+
+  .nav-menu-button {
+    display: inline-flex;
+  }
+
+  .nav-menu {
+    display: grid;
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 20;
+    min-width: 180px;
+    padding: 6px;
+    background: #ffffff;
+    border: 1px solid #dfe5dc;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(23, 32, 28, 0.12);
+  }
+
+  .nav-menu button {
+    text-align: left;
+    min-height: 40px;
+    padding: 0 10px;
+    border-radius: 6px;
+    background: transparent;
+    color: #24312c;
+    font-weight: 700;
+  }
+
+  .nav-menu button.active {
+    background: #173d3a;
+    color: #ffffff;
+  }
+
+  .coin-notes p {
+    font-size: 12px;
+    line-height: 1.35;
   }
 
   .metrics {
@@ -1461,6 +1556,20 @@ textarea:focus {
   display: block;
   border-radius: 12px;
   background: #f4f1eb;
+}
+
+.coin-notes {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.coin-notes p {
+  margin: 0;
+}
+
+.topbar-actions {
+  position: relative;
 }
 
 .coin-stakes {

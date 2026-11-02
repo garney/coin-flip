@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { Bell, CheckCircle2, CircleDollarSign, Loader2, LogOut, MessageCircle, Plus, Search, Send, ShieldCheck, Trophy, UserCircle2, X } from "lucide-react";
+import { Bell, CheckCircle2, CircleDollarSign, Loader2, LogOut, Menu, MessageCircle, Plus, Search, Send, ShieldCheck, Trophy, UserCircle2, X } from "lucide-react";
 import { io, type Socket } from "socket.io-client";
 import type {
   AdminSummary,
@@ -92,6 +92,7 @@ export function App() {
   const [sideBetCommentDraft, setSideBetCommentDraft] = useState("");
   const [sideBetCommentBusy, setSideBetCommentBusy] = useState(false);
   const [view, setView] = useState<AppView>("side-bets");
+  const [menuOpen, setMenuOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const chatOpenRef = useRef(false);
@@ -574,11 +575,8 @@ export function App() {
   return (
     <main className="app-shell">
       <header className="topbar">
-        <div>
-          <div className="brand-row">
-            <img className="brand-logo" src="/assets/coinflip-logo.jpg" alt="Coin flip" />
-          </div>
-          {/* <span className="muted">Single-port app: web, API, and sockets together.</span> */}
+        <div className="brand-row">
+          <img className="brand-logo" src="/assets/coinflip-logo.jpg" alt="Coin flip" />
         </div>
         <div className="topbar-actions">
           <div className="view-switch" aria-label="View switcher">
@@ -587,9 +585,7 @@ export function App() {
               type="button"
               onClick={() => {
                 setView("side-bets");
-                if (routeSideBetId) {
-                  closeSideBetPage();
-                }
+                if (routeSideBetId) closeSideBetPage();
               }}
             >
               Coin flips
@@ -598,9 +594,7 @@ export function App() {
               className={view === "groups" ? "active" : ""}
               type="button"
               onClick={() => {
-                if (routeSideBetId) {
-                  closeSideBetPage();
-                }
+                if (routeSideBetId) closeSideBetPage();
                 setView("groups");
               }}
             >
@@ -611,9 +605,7 @@ export function App() {
                 className={view === "admin" ? "active" : ""}
                 type="button"
                 onClick={() => {
-                  if (routeSideBetId) {
-                    closeSideBetPage();
-                  }
+                  if (routeSideBetId) closeSideBetPage();
                   setView("admin");
                 }}
               >
@@ -624,11 +616,62 @@ export function App() {
           </div>
           <span className="balance">
             <CircleDollarSign size={17} />
-            {profile?.creditsBalance.toFixed(2) ?? "0.00"} credits
+            {profile?.creditsBalance.toFixed(2) ?? "0.00"}
           </span>
-          <button className="icon-button" onClick={signOut} aria-label="Sign out">
+          <button className="icon-button sign-out-button" onClick={signOut} aria-label="Sign out">
             <LogOut size={18} />
           </button>
+          <button className="icon-button nav-menu-button" type="button" aria-label="Open menu" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}>
+            {menuOpen ? <X size={18} /> : <Menu size={18} />}
+          </button>
+          {menuOpen ? (
+            <div className="nav-menu" role="menu">
+              <button
+                type="button"
+                className={view === "side-bets" ? "active" : ""}
+                onClick={() => {
+                  setView("side-bets");
+                  if (routeSideBetId) closeSideBetPage();
+                  setMenuOpen(false);
+                }}
+              >
+                Coin flips
+              </button>
+              <button
+                type="button"
+                className={view === "groups" ? "active" : ""}
+                onClick={() => {
+                  if (routeSideBetId) closeSideBetPage();
+                  setView("groups");
+                  setMenuOpen(false);
+                }}
+              >
+                Groups
+              </button>
+              {profile?.isAdmin || profile?.isGroupAdmin ? (
+                <button
+                  type="button"
+                  className={view === "admin" ? "active" : ""}
+                  onClick={() => {
+                    if (routeSideBetId) closeSideBetPage();
+                    setView("admin");
+                    setMenuOpen(false);
+                  }}
+                >
+                  Admin
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  void signOut();
+                }}
+              >
+                Sign out
+              </button>
+            </div>
+          ) : null}
         </div>
       </header>
 
