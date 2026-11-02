@@ -66,18 +66,7 @@ export function CoinFlipPanel({ page = false }: { page?: boolean }) {
             : next;
         });
         setError("");
-        const closed = new Date(next.closesAt).getTime() <= Date.now();
-        if (!closed || playedWindow.current === next.startsAt) return;
-        if (next.winningOptionId) {
-          playedWindow.current = next.startsAt;
-          setCaption(`Window closed. Landing on ${next.winningOptionId}.`);
-          setShot({ id: Date.now(), face: next.winningOptionId, style: Math.random() < 0.55 ? "bounce" : "spin" });
-        } else if (!next.sideBetId) {
-          playedWindow.current = next.startsAt;
-          const face = previewFace();
-          setCaption(`No stakes. Preview landing on ${face}.`);
-          setShot({ id: Date.now(), face, style: Math.random() < 0.55 ? "bounce" : "spin" });
-        }
+        playClosedWindow(next);
       } catch (err) {
         if (!stop) setError(err instanceof Error ? err.message : "Coin flip unavailable");
       }
@@ -119,6 +108,44 @@ export function CoinFlipPanel({ page = false }: { page?: boolean }) {
 
   const closesIn = state ? Math.max(0, new Date(state.closesAt).getTime() - now) : 0;
   const betting = Boolean(state) && closesIn > 10_000 && state?.status !== "settled";
+
+  function playClosedWindow(next: CoinFlipState) {
+    const closed = new Date(next.closesAt).getTime() <= Date.now();
+    if (!closed || playedWindow.current === next.startsAt) return;
+    if (next.winningOptionId) {
+      playedWindow.current = next.startsAt;
+      setCaption(`Window closed. Landing on ${next.winningOptionId}.`);
+      setShot({ id: Date.now(), face: next.winningOptionId, style: Math.random() < 0.55 ? "bounce" : "spin" });
+      return;
+    }
+    if (!next.sideBetId) {
+      playedWindow.current = next.startsAt;
+      const face = previewFace();
+      setCaption(`No stakes. Preview landing on ${face}.`);
+      setShot({ id: Date.now(), face, style: Math.random() < 0.55 ? "bounce" : "spin" });
+    }
+  }
+
+  useEffect(() => {
+    if ((!page && !open) || !state || closesIn > 0 || playedWindow.current === state.startsAt) return;
+    let stop = false;
+    async function resolve() {
+      try {
+        const next = await api.coinFlip();
+        if (stop) return;
+        setState(next);
+        playClosedWindow(next);
+      } catch (err) {
+        if (!stop) setError(err instanceof Error ? err.message : "Coin flip unavailable");
+      }
+    }
+    void resolve();
+    const timer = window.setInterval(() => void resolve(), 400);
+    return () => {
+      stop = true;
+      window.clearInterval(timer);
+    };
+  }, [closesIn, open, page, state]);
 
   const board = (
           <section className={page ? "coin-modal coin-page" : "coin-modal"} onClick={(event) => event.stopPropagation()}>
@@ -185,10 +212,8 @@ function Countdown({ remainingMs }: { remainingMs: number }) {
   const seconds = totalSeconds % 60;
   const locked = totalSeconds <= 10;
 
-  const urgent = totalSeconds <= 30;
-
   return (
-    <div className={`coin-countdown${urgent ? " is-urgent" : ""}${locked ? " is-locked" : ""}`} aria-live="polite">
+    <div className={`coin-countdown${locked ? " is-locked" : ""}`} aria-live="polite">
       <strong>
         {minutes}:{String(seconds).padStart(2, "0")}
       </strong>

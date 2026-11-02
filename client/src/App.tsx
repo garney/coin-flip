@@ -19,7 +19,7 @@ import { CoinFlipPanel } from "./CoinFlipModal";
 import { supabase } from "./supabase";
 
 type SessionState = "loading" | "signed-out" | "signed-in";
-type AppView = "flip" | "side-bets" | "groups" | "admin";
+type AppView = "side-bets" | "groups" | "admin";
 type PendingSettlement = {
   bet: SideBet;
   optionId: string;
@@ -583,13 +583,6 @@ export function App() {
         <div className="topbar-actions">
           <div className="view-switch" aria-label="View switcher">
             <button
-              className={view === "flip" ? "active" : ""}
-              type="button"
-              onClick={() => setView("flip")}
-            >
-              Flip
-            </button>
-            <button
               className={view === "side-bets" ? "active" : ""}
               type="button"
               onClick={() => {
@@ -640,8 +633,6 @@ export function App() {
       </header>
 
       {message ? <div className="toast">{message}</div> : null}
-
-      {view === "flip" ? <CoinFlipPanel page /> : null}
 
       {view === "side-bets" ? (
         <>

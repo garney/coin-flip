@@ -1451,40 +1451,8 @@ textarea:focus {
   color: #6b645b;
 }
 
-.coin-countdown.is-urgent strong {
-  animation: coin-throb 1.15s ease-in-out infinite;
-}
-
 .coin-countdown.is-locked strong {
   color: #9a3412;
-}
-
-@keyframes coin-tick {
-  from {
-    transform: translateY(-10px) scale(0.92);
-    opacity: 0.35;
-  }
-  to {
-    transform: none;
-    opacity: 1;
-  }
-}
-
-@keyframes coin-throb {
-  0%,
-  42%,
-  100% {
-    transform: scale(1);
-  }
-  12% {
-    transform: scale(1.14);
-  }
-  24% {
-    transform: scale(1);
-  }
-  32% {
-    transform: scale(1.08);
-  }
 }
 
 .coin-canvas {

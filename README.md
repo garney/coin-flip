@@ -1,6 +1,8 @@
 # Coin flip
 
-Coin flip is a single-port web app for a live coin toss every minute. It uses the same stack, deploy shape, and database tables as Coin flip. A toss is stored as a normal coin flip only after someone stakes 1 credit. Point this app at its own Supabase project.
+To stand up another copy, follow [TEMPLATE.md](TEMPLATE.md). It is the setup an agent should run: Supabase, Google Cloud OAuth, local `.env`, and Render.
+
+Coin flip is a single-port web app for a live coin toss every 3 minutes. It uses the same stack, deploy shape, and database tables as Coin flip. A toss is stored as a normal coin flip only after someone stakes 1 credit. Point this app at its own Supabase project.
 
 Coin flip is a single-port web app for running casual prediction pools with credits. A user can create a coin flip, define the question and options, set the buy-in, manage the closing time, and settle the result. Other users can browse, search, join, and stake credits on an option. Credits are recorded through transactions so deposits, buy-ins, payouts, fees, adjustments, and withdrawals can be audited later.
 
