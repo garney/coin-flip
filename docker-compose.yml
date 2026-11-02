@@ -1,0 +1,10 @@
+services:
+  app:
+    build: .
+    ports:
+      - "4123:4123"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 4123

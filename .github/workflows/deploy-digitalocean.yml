@@ -1,0 +1,183 @@
+name: Deploy to DigitalOcean
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      sync_mosquitto_config:
+        description: "Copy Mosquitto config and ACL samples into /etc on the droplet"
+        required: false
+        default: false
+        type: boolean
+      sync_nginx_config:
+        description: "Copy the plain HTTP Nginx sample into /etc on the droplet"
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: digitalocean-production
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and verify
+    runs-on: ubuntu-latest
+    env:
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Package release
+        run: |
+          mkdir -p release
+          cp package.json package-lock.json release/
+          cp -R dist release/dist
+          mkdir -p release/client
+          cp -R client/dist release/client/dist
+          cp -R deploy release/deploy
+          tar -czf coin-flip-release.tgz -C release .
+
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coin-flip-release
+          path: coin-flip-release.tgz
+          if-no-files-found: error
+          retention-days: 1
+
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: build
+    environment: production
+    env:
+      DEPLOY_HOST: ${{ secrets.DO_HOST }}
+      DEPLOY_USER: ${{ secrets.DO_USER }}
+      DEPLOY_PORT: ${{ secrets.DO_SSH_PORT || '22' }}
+      APP_DIR: /var/www/coin-flip
+      RELEASE_ID: ${{ github.sha }}
+    steps:
+      - name: Download release artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: coin-flip-release
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.DO_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p "$DEPLOY_PORT" "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+
+      - name: Upload release bundle
+        run: |
+          scp -P "$DEPLOY_PORT" coin-flip-release.tgz "$DEPLOY_USER@$DEPLOY_HOST:/tmp/coin-flip-release-$RELEASE_ID.tgz"
+
+      - name: Install and restart app
+        run: |
+          ssh -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "APP_DIR='$APP_DIR' RELEASE_ID='$RELEASE_ID' \
+            NODE_ENV='production' \
+            PORT='4123' \
+            SUPABASE_URL='${{ secrets.SUPABASE_URL }}' \
+            SUPABASE_ANON_KEY='${{ secrets.SUPABASE_ANON_KEY }}' \
+            SUPABASE_SERVICE_ROLE_KEY='${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}' \
+            VITE_SUPABASE_URL='${{ secrets.VITE_SUPABASE_URL }}' \
+            VITE_SUPABASE_ANON_KEY='${{ secrets.VITE_SUPABASE_ANON_KEY }}' \
+            ADMIN_USER_IDS='${{ secrets.ADMIN_USER_IDS }}' \
+            bash -s" <<'REMOTE'
+          set -euo pipefail
+
+          RELEASE_DIR="$APP_DIR/releases/$RELEASE_ID"
+          mkdir -p "$APP_DIR/releases"
+          rm -rf "$RELEASE_DIR"
+          mkdir -p "$RELEASE_DIR"
+          tar -xzf "/tmp/coin-flip-release-$RELEASE_ID.tgz" -C "$RELEASE_DIR"
+
+          cat > "$RELEASE_DIR/.env" <<ENV
+          NODE_ENV=$NODE_ENV
+          PORT=$PORT
+          SUPABASE_URL=$SUPABASE_URL
+          SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY
+          SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY
+          VITE_SUPABASE_URL=$VITE_SUPABASE_URL
+          VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
+          ADMIN_USER_IDS=$ADMIN_USER_IDS
+          ENV
+
+          cd "$RELEASE_DIR"
+          mkdir -p "$APP_DIR/.npm-cache"
+          npm ci --omit=dev --cache "$APP_DIR/.npm-cache"
+
+          if [ -d "$APP_DIR/current" ] && [ ! -L "$APP_DIR/current" ]; then
+            mv "$APP_DIR/current" "$APP_DIR/current.backup.$(date +%Y%m%d%H%M%S)"
+          fi
+          ln -sfnT "$RELEASE_DIR" "$APP_DIR/current"
+          cd "$APP_DIR/current"
+          test -f dist/server/server/index.js
+
+          export PM2_HOME="$APP_DIR/.pm2"
+          mkdir -p "$PM2_HOME"
+          pm2 startOrReload deploy/digitalocean/ecosystem.config.cjs --update-env
+          pm2 save
+          sleep 2
+          curl -fsS "http://127.0.0.1:$PORT" >/dev/null
+          rm -f "/tmp/coin-flip-release-$RELEASE_ID.tgz"
+          ls -1dt "$APP_DIR"/releases/* | tail -n +4 | xargs -r rm -rf
+          REMOTE
+
+      - name: Sync Mosquitto config
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.sync_mosquitto_config }}
+        run: |
+          ssh -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "APP_DIR='$APP_DIR' bash -s" <<'REMOTE'
+          set -euo pipefail
+
+          cd "$APP_DIR/current"
+
+          sudo install -m 644 deploy/digitalocean/mosquitto-sidebets.conf /etc/mosquitto/conf.d/sidebets.conf
+          sudo install -o root -g mosquitto -m 640 deploy/digitalocean/sidebets.acl /etc/mosquitto/acl
+          sudo systemctl restart mosquitto
+          sudo systemctl is-active --quiet mosquitto
+          REMOTE
+
+      - name: Sync Nginx config
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.sync_nginx_config }}
+        run: |
+          ssh -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "APP_DIR='$APP_DIR' bash -s" <<'REMOTE'
+          set -euo pipefail
+
+          cd "$APP_DIR/current"
+
+          sudo install -m 644 deploy/digitalocean/nginx-sidebets.conf /etc/nginx/sites-available/coin-flip
+          if [ ! -e /etc/nginx/sites-enabled/coin-flip ]; then
+            sudo ln -s /etc/nginx/sites-available/coin-flip /etc/nginx/sites-enabled/coin-flip
+          fi
+          sudo nginx -t
+          sudo systemctl reload nginx
+          REMOTE

@@ -1,0 +1,14 @@
+# Replace sidebets_awtrix with the MQTT username you create with mosquitto_passwd.
+# All AWTRIX clocks can share this user if they only need to subscribe.
+user sidebets_awtrix
+topic read sidebets/#
+topic read astroPrivateFeed/#
+
+# Use this account from the Side Bets app/server when publishing notifications.
+user sidebets_app
+topic readwrite sidebets/#
+
+# Optional publisher for Astro/Mission Control integrations.
+user astro_app
+topic readwrite sidebets/#
+topic readwrite astroPrivateFeed/#
