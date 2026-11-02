@@ -1,6 +1,6 @@
 # Mosquitto Operations
 
-This file is the runbook for the Side Bets MQTT broker on the DigitalOcean droplet.
+This file is the runbook for the Coin flip MQTT broker on the DigitalOcean droplet.
 
 The broker is plain MQTT on port `1883` because AWTRIX does not currently use MQTT over TLS in this setup.
 
@@ -40,7 +40,7 @@ sudo systemctl enable mosquitto
 
 ## Broker Config
 
-The Side Bets config should stay minimal because Ubuntu's default `/etc/mosquitto/mosquitto.conf` already sets persistence and logging.
+The Coin flip config should stay minimal because Ubuntu's default `/etc/mosquitto/mosquitto.conf` already sets persistence and logging.
 
 `/etc/mosquitto/conf.d/sidebets.conf`:
 

@@ -47,7 +47,7 @@ function pickDefaultGroupId(groups: Group[], profile: Profile | null, currentId:
 
 const defaultForm = {
   title: "Will volume exceed _M Yen on _ _",
-  description: "Will volume exceed _M Yen on Tuesday _\nSide Bet closes 11:30 am _\nwill be settled 10 am the next day",
+  description: "Will volume exceed _M Yen on Tuesday _\nCoin flip closes 11:30 am _\nwill be settled 10 am the next day",
   sourceUrl: "https://mission-control-client.astro.space/login",
   buyInCredits: "",
   closesDate: "",
@@ -91,7 +91,7 @@ export function App() {
   const [sideBetComments, setSideBetComments] = useState<ChatMessage[]>([]);
   const [sideBetCommentDraft, setSideBetCommentDraft] = useState("");
   const [sideBetCommentBusy, setSideBetCommentBusy] = useState(false);
-  const [view, setView] = useState<AppView>("flip");
+  const [view, setView] = useState<AppView>("side-bets");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const chatOpenRef = useRef(false);
@@ -105,8 +105,8 @@ export function App() {
   const activeSideBetId = routeSideBetId ?? selectedSideBetId;
 
   const refreshSideBetList = useCallback(async () => {
-    setSideBets(await api.sideBets(search, status));
-  }, [search, status]);
+    setSideBets(await api.sideBets("", "settled"));
+  }, []);
 
   const refreshSelectedSideBet = useCallback(async () => {
     if (!activeSideBetId) return;
@@ -149,7 +149,7 @@ export function App() {
     try {
       const [me, bets, wallet, walletRedemptions, walletCreditRequests, nextGroups] = await Promise.all([
         api.me(),
-        api.sideBets(search, status),
+        api.sideBets("", "settled"),
         api.transactions(),
         api.redemptions(),
         api.creditRequests(),
@@ -169,7 +169,7 @@ export function App() {
     } finally {
       setSideBetsLoading(false);
     }
-  }, [refreshAdminData, search, status]);
+  }, [refreshAdminData]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -240,7 +240,7 @@ export function App() {
       .catch((error) => {
         if (!cancelled) {
           setSelectedSideBet(null);
-          setMessage(error instanceof Error ? error.message : "Could not load side bet");
+          setMessage(error instanceof Error ? error.message : "Could not load coin flip");
         }
       })
       .finally(() => {
@@ -476,23 +476,14 @@ export function App() {
     setSelectedSideBetLoading(false);
   }
 
-  function openCreateModal() {
-    setForm((current) => {
-      const currentGroupValid = creatableGroups.some((group) => group.id === current.groupId);
-      const defaultGroupId = creatableGroups.length === 1 ? creatableGroups[0].id : currentGroupValid ? current.groupId : creatableGroups[0]?.id ?? "";
-      return { ...current, groupId: defaultGroupId };
-    });
-    setCreateModalOpen(true);
-  }
-
   async function createBet(event: FormEvent) {
     event.preventDefault();
     await withAction(async () => {
       if (!form.buyInCredits || !form.closesDate || !form.closesTime) {
-        throw new Error("Add a buy-in amount, close date, and close time before creating the side bet");
+        throw new Error("Add a buy-in amount, close date, and close time before creating the coin flip");
       }
       if (creatableGroups.length > 1 && !form.groupId) {
-        throw new Error("Select which group this side bet is for");
+        throw new Error("Select which group this coin flip is for");
       }
 
       const now = new Date();
@@ -516,7 +507,7 @@ export function App() {
         ...(form.groupId ? { groupId: form.groupId } : {})
       });
       setCreateModalOpen(false);
-    }, "Side bet created");
+    }, "Coin flip created");
   }
 
   async function sendChatMessage(event: FormEvent) {
@@ -560,15 +551,15 @@ export function App() {
   }
 
   if (sessionState === "loading") {
-    return <main className="center-screen">Loading SideBet...</main>;
+    return <main className="center-screen">Loading Coin flip...</main>;
   }
 
   if (sessionState === "signed-out") {
     return (
       <main className="auth-screen">
         <section className="auth-panel">
-          <img className="auth-logo" src="/assets/sidebets.png" alt="SideBet" />
-          <h1 className="sr-only">SideBet</h1>
+          <img className="auth-logo" src="/assets/coinflip-logo.jpg" alt="Coin flip" />
+          <h1 className="sr-only">Coin flip</h1>
           <p>Create trusted prediction pools, buy in with credits, and settle results when the outcome is known.</p>
           <button className="primary-button" onClick={signIn}>
             <UserCircle2 size={18} />
@@ -585,7 +576,7 @@ export function App() {
       <header className="topbar">
         <div>
           <div className="brand-row">
-            <img className="brand-logo" src="/assets/sidebets.png" alt="Coin flip" />
+            <img className="brand-logo" src="/assets/coinflip-logo.jpg" alt="Coin flip" />
           </div>
           {/* <span className="muted">Single-port app: web, API, and sockets together.</span> */}
         </div>
@@ -608,7 +599,7 @@ export function App() {
                 }
               }}
             >
-              Side bets
+              Coin flips
             </button>
             <button
               className={view === "groups" ? "active" : ""}
@@ -678,29 +669,13 @@ export function App() {
               activeBets={activeBets}
               sideBets={sideBets}
               loading={sideBetsLoading}
-              status={status}
-              search={search}
               busy={busy}
               profile={profile}
               transactions={transactions}
               redemptions={redemptions}
               creditRequests={creditRequests}
-              onSearchChange={setSearch}
-              onStatusChange={setStatus}
-              onCreate={openCreateModal}
               onView={openSideBetPage}
               onAction={withAction}
-              onSettleRequest={setPendingSettlement}
-            />
-          ) : null}
-          {createModalOpen ? (
-            <CreateSideBetModal
-              form={form}
-              creatableGroups={creatableGroups}
-              busy={busy}
-              onClose={() => setCreateModalOpen(false)}
-              onSubmit={createBet}
-              onChange={setForm}
             />
           ) : null}
           {selectedSideBetId ? (
@@ -730,7 +705,7 @@ export function App() {
               onConfirm={async () => {
                 await withAction(
                   () => api.settleSideBet(pendingSettlement.bet.id, pendingSettlement.optionId),
-                  `Side bet settled with ${pendingSettlement.bet.options.find((option) => option.id === pendingSettlement.optionId)?.label ?? "selected result"}`
+                  `Coin flip settled with ${pendingSettlement.bet.options.find((option) => option.id === pendingSettlement.optionId)?.label ?? "selected result"}`
                 );
                 setPendingSettlement(null);
               }}
@@ -885,135 +860,66 @@ function SideBetListView({
   activeBets,
   sideBets,
   loading,
-  status,
-  search,
   busy,
   profile,
   transactions,
   redemptions,
   creditRequests,
-  onSearchChange,
-  onStatusChange,
-  onCreate,
   onView,
-  onAction,
-  onSettleRequest
+  onAction
 }: {
   activeBets: number;
   sideBets: SideBet[];
   loading: boolean;
-  status: string;
-  search: string;
   busy: boolean;
   profile: Profile | null;
   transactions: CreditTransaction[];
   redemptions: RedemptionRequest[];
   creditRequests: CreditRequest[];
-  onSearchChange: (search: string) => void;
-  onStatusChange: (status: string) => void;
-  onCreate: () => void;
   onView: (id: string) => void;
   onAction: (action: () => Promise<unknown>, success: string) => Promise<void>;
-  onSettleRequest: (settlement: PendingSettlement) => void;
 }) {
+  const settled = sideBets.filter((bet) => bet.status === "settled").slice(0, 30);
+
   return (
     <>
       <section className="metrics">
         <Metric icon={<Bell size={18} />} label="Open bets" value={loading ? "…" : activeBets.toString()} />
-        <Metric icon={<Trophy size={18} />} label="Total bets" value={loading ? "…" : sideBets.length.toString()} />
+        <Metric icon={<Trophy size={18} />} label="Settled" value={loading ? "…" : settled.length.toString()} />
         <Metric icon={<CircleDollarSign size={18} />} label="Wallet" value={`${profile?.creditsBalance.toFixed(2) ?? "0.00"} cr`} />
         <Metric icon={<CheckCircle2 size={18} />} label="Fee" value="0%" />
       </section>
 
       <section className="workspace">
-        <aside className="filters">
-          <label className="search-box">
-            <Search size={17} />
-            <input value={search} onChange={(event) => onSearchChange(event.target.value)} placeholder="Search side bets" />
-          </label>
-          <label>
-            Status
-            <select value={status} onChange={(event) => onStatusChange(event.target.value)}>
-              <option value="all">All</option>
-              <option value="open">Open</option>
-              <option value="settled">Settled</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
-          </label>
-          <p className="muted">Credits are added by admins from the admin centre.</p>
+        <aside className="filters settled-history" aria-label="Settled flips">
+          <div className="section-heading">
+            <h2>Last 30</h2>
+            <span>{loading ? "…" : settled.length}</span>
+          </div>
+          {loading ? (
+            <LoadingSpinner label="Loading flips..." size={22} />
+          ) : settled.length === 0 ? (
+            <p className="muted">No settled flips yet.</p>
+          ) : (
+            <ul>
+              {settled.map((bet) => (
+                <li key={bet.id}>
+                  <button type="button" onClick={() => onView(bet.id)}>
+                    <strong>{bet.winningOptionId ?? "Settled"}</strong>
+                    <span>{new Date(bet.settlesAt ?? bet.closesAt).toLocaleString()}</span>
+                    <em>{bet.potCredits.toFixed(2)} cr</em>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </aside>
 
         <div className="main-column">
-          <section className="bet-list" aria-label="Side bets" aria-busy={loading}>
-            <div className="section-heading">
-              <h2>{status === "all" ? "All Side Bets" : `${status[0].toUpperCase()}${status.slice(1)} Side Bets`}</h2>
-              <span>{loading ? "Loading..." : `${sideBets.length} visible`}</span>
-            </div>
-            {loading ? (
-              <div className="bet-list-loading">
-                <LoadingSpinner label="Loading side bets..." size={28} />
-              </div>
-            ) : (
-              <div className="table">
-                <div className="table-row table-head">
-                  <span>Bet</span>
-                  <span>Buy-in</span>
-                  <span>Pot</span>
-                  <span>Closes</span>
-                  <span>Action</span>
-                </div>
-                {sideBets.map((bet) => (
-                  <article className="table-row" key={bet.id}>
-                    <div>
-                      <div className="bet-title-row">
-                        <strong>{bet.title}</strong>
-                        <div className="bet-title-actions">
-                          <button className="text-button" type="button" onClick={() => onView(bet.id)}>
-                            View
-                          </button>
-                        </div>
-                      </div>
-                      <p>{bet.description}</p>
-                      <div className="bet-meta">
-                        <span className="muted">Manager: {bet.managerName}</span>
-                        {bet.groupName ? (
-                          <span className="bet-group-pill">
-                            {bet.groupName}
-                            {bet.isPrivate ? " · private" : ""}
-                          </span>
-                        ) : null}
-                      </div>
-                      {bet.currentUserEntry ? <ChoiceLabel label={bet.currentUserEntry.optionLabel} compact /> : null}
-                    </div>
-                    <span>{bet.buyInCredits} cr</span>
-                    <span>{bet.potCredits.toFixed(2)} cr</span>
-                    <span>{new Date(bet.closesAt).toLocaleString()}</span>
-                    <BetActions
-                      bet={bet}
-                      busy={busy}
-                      onAction={onAction}
-                      canSettle={profile?.id === bet.managerId || Boolean(profile?.isAdmin)}
-                      onSettleRequest={onSettleRequest}
-                    />
-                  </article>
-                ))}
-                {sideBets.length === 0 ? <div className="empty-state">No side bets match this view.</div> : null}
-              </div>
-            )}
-          </section>
+          <CoinFlipPanel page />
         </div>
 
         <aside className="create-panel">
-          <section className="create-entry">
-            <div className="section-heading">
-              <h2>Create</h2>
-              <Plus size={18} />
-            </div>
-            <button className="primary-button" type="button" onClick={onCreate}>
-              Create side bet
-            </button>
-          </section>
-
           <Wallet transactions={transactions} redemptions={redemptions} creditRequests={creditRequests} busy={busy} onAction={onAction} />
         </aside>
       </section>
@@ -1057,7 +963,7 @@ function SideBetPage({
   return (
     <section className="side-bet-page">
       <button className="text-button back-button" type="button" onClick={onBack}>
-        Back to side bets
+        Back to coin flips
       </button>
       <SideBetFocusPanel
         bet={bet}
@@ -1334,17 +1240,17 @@ function CreateSideBetModal({
 
   return (
     <div className="modal-backdrop" role="presentation" onClick={onClose}>
-      <div className="modal-panel" role="dialog" aria-modal="true" aria-label="Create side bet" onClick={(event) => event.stopPropagation()}>
-        <button className="icon-button modal-close" type="button" onClick={onClose} aria-label="Close create side bet">
+      <div className="modal-panel" role="dialog" aria-modal="true" aria-label="Create coin flip" onClick={(event) => event.stopPropagation()}>
+        <button className="icon-button modal-close" type="button" onClick={onClose} aria-label="Close create coin flip">
           <X size={18} />
         </button>
         <form className="side-bet-create-form" onSubmit={onSubmit}>
           <div className="section-heading">
-            <h2>Create Side Bet</h2>
+            <h2>Create Coin flip</h2>
             <span>Draft details</span>
           </div>
           {creatableGroups.length === 0 ? (
-            <p className="muted">Join a group before creating a side bet.</p>
+            <p className="muted">Join a group before creating a coin flip.</p>
           ) : requiresGroupSelection ? (
             <label>
               Group
@@ -1402,7 +1308,7 @@ function CreateSideBetModal({
             className="primary-button"
             disabled={busy || creatableGroups.length === 0 || !form.buyInCredits || !form.closesDate || !form.closesTime || (requiresGroupSelection && !form.groupId)}
           >
-            <BusyButtonLabel busy={busy} idleLabel="Create side bet" busyLabel="Creating..." />
+            <BusyButtonLabel busy={busy} idleLabel="Create coin flip" busyLabel="Creating..." />
           </button>
         </form>
       </div>
@@ -1425,7 +1331,7 @@ function SettleConfirmationModal({
 
   return (
     <div className="modal-backdrop" role="presentation" onClick={onClose}>
-      <div className="confirm-modal" role="dialog" aria-modal="true" aria-label="Confirm side bet settlement" onClick={(event) => event.stopPropagation()}>
+      <div className="confirm-modal" role="dialog" aria-modal="true" aria-label="Confirm coin flip settlement" onClick={(event) => event.stopPropagation()}>
         <button className="icon-button modal-close" type="button" onClick={onClose} aria-label="Close settlement confirmation">
           <X size={18} />
         </button>
@@ -1440,7 +1346,7 @@ function SettleConfirmationModal({
             <strong>{selectedOption?.label ?? "Unknown option"}</strong>
           </div>
           <p className="muted">
-            This will settle the side bet with the selected result, distribute the pot to matching guesses, and mark the side bet as settled.
+            This will settle the coin flip with the selected result, distribute the pot to matching guesses, and mark the coin flip as settled.
           </p>
           <div className="confirm-actions">
             <button className="text-button" type="button" disabled={busy} onClick={onClose}>
@@ -1495,8 +1401,8 @@ function SideBetModal({
 }) {
   return (
     <div className="modal-backdrop" role="presentation" onClick={onClose}>
-      <div className="modal-panel" role="dialog" aria-modal="true" aria-label={bet ? `${bet.title} details` : "Side bet details"} onClick={(event) => event.stopPropagation()}>
-        <button className="icon-button modal-close" type="button" onClick={onClose} aria-label="Close side bet details">
+      <div className="modal-panel" role="dialog" aria-modal="true" aria-label={bet ? `${bet.title} details` : "Coin flip details"} onClick={(event) => event.stopPropagation()}>
+        <button className="icon-button modal-close" type="button" onClick={onClose} aria-label="Close coin flip details">
           <X size={18} />
         </button>
         <SideBetFocusPanel
@@ -1568,14 +1474,14 @@ function SideBetFocusPanel({
 
   if (loading) {
     return (
-      <section className="side-bet-focus side-bet-loading" aria-label="Loading side bet">
-        <LoadingSpinner label="Loading side bet..." size={28} />
+      <section className="side-bet-focus side-bet-loading" aria-label="Loading coin flip">
+        <LoadingSpinner label="Loading coin flip..." size={28} />
       </section>
     );
   }
 
   if (!bet) {
-    return <section className="side-bet-focus empty-state">No side bet selected.</section>;
+    return <section className="side-bet-focus empty-state">No coin flip selected.</section>;
   }
 
   const winningOption = bet.options.find((option) => option.id === bet.winningOptionId);
@@ -1705,14 +1611,14 @@ function EditSideBetForm({
             .map((option) => option.trim())
             .filter(Boolean)
         }),
-      "Side bet updated"
+      "Coin flip updated"
     );
   }
 
   return (
     <form className="side-bet-edit-form" onSubmit={updateSideBet}>
       <div className="section-heading">
-        <h2>Edit Side Bet</h2>
+        <h2>Edit Coin flip</h2>
         <span>Creator only</span>
       </div>
       <label>
@@ -1749,7 +1655,7 @@ function EditSideBetForm({
       </label>
       {hasEntries ? <p className="muted">Buy-in and options are locked because users have already joined.</p> : null}
       <button className="primary-button" disabled={busy}>
-        <BusyButtonLabel busy={busy} idleLabel="Save side bet" busyLabel="Saving..." />
+        <BusyButtonLabel busy={busy} idleLabel="Save coin flip" busyLabel="Saving..." />
       </button>
     </form>
   );
@@ -1864,7 +1770,7 @@ function RectifySettlementForm({
 
   async function rectifySettlement(event: FormEvent) {
     event.preventDefault();
-    await onAction(() => api.rectifySideBet(bet.id, correctedOptionId), "Side bet settlement rectified");
+    await onAction(() => api.rectifySideBet(bet.id, correctedOptionId), "Coin flip settlement rectified");
   }
 
   return (
@@ -1952,7 +1858,7 @@ function BetActions({
         onClick={() =>
           onAction(
             () => api.joinSideBet(bet.id, optionId),
-            bet.currentUserEntry ? `Choice changed to ${selectedOption?.label ?? "selected option"}` : "Joined side bet"
+            bet.currentUserEntry ? `Choice changed to ${selectedOption?.label ?? "selected option"}` : "Joined coin flip"
           )
         }
       >

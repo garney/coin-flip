@@ -167,11 +167,11 @@ export function createApiRouter(realtime: RealtimeNotifier) {
 
     if (room === "side_bet") {
       if (!sideBetId) {
-        res.status(400).json({ error: "sideBetId is required for side bet chat" });
+        res.status(400).json({ error: "sideBetId is required for coin flip chat" });
         return;
       }
       if (!(await canViewSideBet(sideBetId, (req as AuthedRequest).user))) {
-        res.status(403).json({ error: "You do not have access to this side bet" });
+        res.status(403).json({ error: "You do not have access to this coin flip" });
         return;
       }
       query = query.eq("side_bet_id", sideBetId);
@@ -204,11 +204,11 @@ export function createApiRouter(realtime: RealtimeNotifier) {
     const sideBetId = room === "side_bet" ? parsed.data.sideBetId : null;
 
     if (room === "side_bet" && !sideBetId) {
-      res.status(400).json({ error: "sideBetId is required for side bet chat" });
+      res.status(400).json({ error: "sideBetId is required for coin flip chat" });
       return;
     }
     if (sideBetId && !(await canViewSideBet(sideBetId, user))) {
-      res.status(403).json({ error: "You do not have access to this side bet" });
+      res.status(403).json({ error: "You do not have access to this coin flip" });
       return;
     }
 
@@ -531,13 +531,13 @@ export function createApiRouter(realtime: RealtimeNotifier) {
       .single();
 
     if (error || !data) {
-      res.status(404).json({ error: "Side bet not found" });
+      res.status(404).json({ error: "Coin flip not found" });
       return;
     }
 
     const user = (req as AuthedRequest).user;
     if (!(await canViewGroup(data.group_id ?? null, user))) {
-      res.status(403).json({ error: "You do not have access to this side bet" });
+      res.status(403).json({ error: "You do not have access to this coin flip" });
       return;
     }
     res.json(mapSideBetDetail(data, user.id));
@@ -556,7 +556,7 @@ export function createApiRouter(realtime: RealtimeNotifier) {
     try {
       groupId = await resolveCreateBetGroupId(parsed.data.groupId, user);
     } catch (error) {
-      res.status(400).json({ error: error instanceof Error ? error.message : "Select a group for this side bet" });
+      res.status(400).json({ error: error instanceof Error ? error.message : "Select a group for this coin flip" });
       return;
     }
 
@@ -602,21 +602,21 @@ export function createApiRouter(realtime: RealtimeNotifier) {
       .single();
 
     if (betError || !bet) {
-      res.status(404).json({ error: "Side bet not found" });
+      res.status(404).json({ error: "Coin flip not found" });
       return;
     }
 
     if (bet.manager_id !== user.id) {
-      res.status(403).json({ error: "Only the side bet creator can edit this side bet" });
+      res.status(403).json({ error: "Only the coin flip creator can edit this coin flip" });
       return;
     }
     if (!(await canViewGroup(bet.group_id ?? null, user))) {
-      res.status(403).json({ error: "You do not have access to this side bet" });
+      res.status(403).json({ error: "You do not have access to this coin flip" });
       return;
     }
 
     if (bet.status !== "open") {
-      res.status(409).json({ error: "Only open side bets can be edited" });
+      res.status(409).json({ error: "Only open coin flips can be edited" });
       return;
     }
 
@@ -671,16 +671,16 @@ export function createApiRouter(realtime: RealtimeNotifier) {
     const user = (req as AuthedRequest).user;
     const { data: bet, error: betError } = await supabaseAdmin.from("side_bets").select("*").eq("id", req.params.id).single();
     if (betError || !bet) {
-      res.status(404).json({ error: "Side bet not found" });
+      res.status(404).json({ error: "Coin flip not found" });
       return;
     }
     if (!(await canViewGroup(bet.group_id ?? null, user))) {
-      res.status(403).json({ error: "You do not have access to this side bet" });
+      res.status(403).json({ error: "You do not have access to this coin flip" });
       return;
     }
 
     if (bet.status !== "open" || new Date(bet.closes_at).getTime() <= Date.now()) {
-      res.status(409).json({ error: "This side bet is not open for entries" });
+      res.status(409).json({ error: "This coin flip is not open for entries" });
       return;
     }
 
@@ -775,16 +775,16 @@ export function createApiRouter(realtime: RealtimeNotifier) {
     const user = (req as AuthedRequest).user;
     const { data: bet, error: betError } = await supabaseAdmin.from("side_bets").select("*").eq("id", req.params.id).single();
     if (betError || !bet) {
-      res.status(404).json({ error: "Side bet not found" });
+      res.status(404).json({ error: "Coin flip not found" });
       return;
     }
     if (!(await canViewGroup(bet.group_id ?? null, user))) {
-      res.status(403).json({ error: "You do not have access to this side bet" });
+      res.status(403).json({ error: "You do not have access to this coin flip" });
       return;
     }
 
     if (bet.manager_id !== user.id && !user.isAdmin) {
-      res.status(403).json({ error: "Only the manager or an admin can settle this side bet" });
+      res.status(403).json({ error: "Only the manager or an admin can settle this coin flip" });
       return;
     }
 
@@ -855,12 +855,12 @@ export function createApiRouter(realtime: RealtimeNotifier) {
     const admin = (req as AuthedRequest).user;
     const { data: bet, error: betError } = await supabaseAdmin.from("side_bets").select("*").eq("id", req.params.id).single();
     if (betError || !bet) {
-      res.status(404).json({ error: "Side bet not found" });
+      res.status(404).json({ error: "Coin flip not found" });
       return;
     }
 
     if (bet.status !== "settled" || !bet.winning_option_id) {
-      res.status(409).json({ error: "Only settled side bets can be rectified" });
+      res.status(409).json({ error: "Only settled coin flips can be rectified" });
       return;
     }
 
@@ -1652,7 +1652,7 @@ async function canCreateBetInGroup(groupId: string, user: AuthedRequest["user"])
 async function resolveCreateBetGroupId(groupId: string | undefined, user: AuthedRequest["user"]) {
   if (groupId) {
     if (!(await canCreateBetInGroup(groupId, user))) {
-      throw new Error("You do not have permission to create side bets in this group");
+      throw new Error("You do not have permission to create coin flips in this group");
     }
     return groupId;
   }
@@ -1666,10 +1666,10 @@ async function resolveCreateBetGroupId(groupId: string | undefined, user: Authed
     if (await canCreateBetInGroup(stationAlphaGroupId, user)) {
       return stationAlphaGroupId;
     }
-    throw new Error("Join a group before creating a side bet");
+    throw new Error("Join a group before creating a coin flip");
   }
 
-  throw new Error("Select a group for this side bet");
+  throw new Error("Select a group for this coin flip");
 }
 
 async function canViewGroup(groupId: string | null, user: AuthedRequest["user"]) {

@@ -134,7 +134,7 @@ export function CoinFlipPanel({ page = false }: { page?: boolean }) {
             <Countdown remainingMs={closesIn} />
             <p className="muted">{caption}</p>
             <p className="muted">
-              Stake is 1 credit. Bets lock with 10 seconds left. A side bet is saved only after someone stakes.
+              Stake is 1 credit. Bets lock with 10 seconds left. A coin flip is saved only after someone stakes.
             </p>
             <p className="muted">
               Starts {state?.startFace ?? "…"}. Same face about 51% (Diaconis). Edge about 1 in 6,000 (Murray and Teare).

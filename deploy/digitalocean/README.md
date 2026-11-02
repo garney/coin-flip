@@ -1,9 +1,9 @@
 # DigitalOcean Deployment
 
-This handoff moves Side Bets from Render to a single always-on DigitalOcean droplet that hosts:
+This handoff moves Coin flip from Render to a single always-on DigitalOcean droplet that hosts:
 
 - Mosquitto MQTT broker on port `1883`
-- Node.js Side Bets API and Socket.IO server on port `4123`
+- Node.js Coin flip API and Socket.IO server on port `4123`
 - React frontend served by the same Node process
 - Nginx reverse proxy on ports `80` and `443`
 - PM2 process manager
@@ -155,7 +155,7 @@ mosquitto_sub -h localhost -p 1883 -u sidebets_awtrix -P 'AWTRIX_PASSWORD' -t 's
 In another SSH session:
 
 ```bash
-mosquitto_pub -h localhost -p 1883 -u sidebets_app -P 'APP_PASSWORD' -t 'sidebets/test' -m 'hello from Side Bets'
+mosquitto_pub -h localhost -p 1883 -u sidebets_app -P 'APP_PASSWORD' -t 'sidebets/test' -m 'hello from Coin flip'
 ```
 
 Test from your local machine:
@@ -165,7 +165,7 @@ mosquitto_sub -h sidebet.amongfriends.net -p 1883 -u sidebets_awtrix -P 'AWTRIX_
 mosquitto_pub -h sidebet.amongfriends.net -p 1883 -u sidebets_app -P 'APP_PASSWORD' -t 'sidebets/test' -m 'hello from local'
 ```
 
-## 5. Deploy Side Bets App
+## 5. Deploy Coin flip App
 
 Create the app folder:
 
@@ -177,7 +177,7 @@ sudo chown -R deploy:deploy /var/www/side-bets
 Clone the repo:
 
 ```bash
-git clone https://github.com/garney/side-bets.git /var/www/side-bets/current
+git clone https://github.com/garney/coin-flip.git /var/www/side-bets/current
 cd /var/www/side-bets/current
 ```
 

@@ -403,7 +403,7 @@ button:disabled {
 
 .workspace {
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr) 360px;
+  grid-template-columns: 260px minmax(0, 1fr) 360px;
   gap: 16px;
   align-items: start;
 }
@@ -1366,6 +1366,44 @@ textarea:focus {
 .coin-page {
   width: min(640px, 100%);
   margin: 24px auto;
+}
+
+.main-column .coin-page {
+  width: 100%;
+  margin: 0;
+}
+
+.settled-history ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  max-height: calc(100vh - 280px);
+  overflow: auto;
+}
+
+.settled-history button {
+  width: 100%;
+  text-align: left;
+  background: #f7f8f6;
+  border: 1px solid #e3e8e1;
+  border-radius: 8px;
+  padding: 8px 10px;
+  display: grid;
+  gap: 2px;
+  cursor: pointer;
+}
+
+.settled-history strong {
+  text-transform: capitalize;
+}
+
+.settled-history span,
+.settled-history em {
+  color: #64716d;
+  font-size: 12px;
+  font-style: normal;
 }
 
 .coin-modal {

@@ -1,0 +1,9 @@
+node_modules
+dist
+client/dist
+.git
+.env
+.env.*
+supabase/.temp
+supabase/.branches
+*.md

@@ -58,8 +58,8 @@ if (config.nodeEnv === "production") {
   app.use(vite.middlewares);
 }
 
-server.listen(config.port, () => {
-  console.log(`Side Bets listening on http://localhost:${config.port}`);
+server.listen(config.port, "0.0.0.0", () => {
+  console.log(`Coin flip listening on http://0.0.0.0:${config.port}`);
 });
 
 setInterval(() => {

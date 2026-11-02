@@ -1,8 +1,8 @@
 # Coin flip
 
-Coin flip is a single-port web app for a live coin toss every 10 minutes. It uses the same stack, deploy shape, and database tables as Side Bets. A toss is stored as a normal side bet only after someone stakes 1 credit. Point this app at its own Supabase project.
+Coin flip is a single-port web app for a live coin toss every minute. It uses the same stack, deploy shape, and database tables as Coin flip. A toss is stored as a normal coin flip only after someone stakes 1 credit. Point this app at its own Supabase project.
 
-Side Bets is a single-port web app for running casual prediction pools with credits. A user can create a side bet, define the question and options, set the buy-in, manage the closing time, and settle the result. Other users can browse, search, join, and stake credits on an option. Credits are recorded through transactions so deposits, buy-ins, payouts, fees, adjustments, and withdrawals can be audited later.
+Coin flip is a single-port web app for running casual prediction pools with credits. A user can create a coin flip, define the question and options, set the buy-in, manage the closing time, and settle the result. Other users can browse, search, join, and stake credits on an option. Credits are recorded through transactions so deposits, buy-ins, payouts, fees, adjustments, and withdrawals can be audited later.
 
 This first version is intentionally simple: one Node process serves the React client, REST APIs, and Socket.IO events on the same port. That keeps local development and deployment easy while the product shape is still forming. The app can be split into separate client/API/realtime services later if the scale or release process needs it.
 
@@ -10,10 +10,10 @@ This first version is intentionally simple: one Node process serves the React cl
 
 - Users sign in with Google SSO through Supabase Auth.
 - Each user has a profile and a credit balance.
-- A side bet is managed by the user who created it.
-- A side bet has a title, description, optional source URL, buy-in amount, start time, close time, options, status, and optional winning option.
-- Users join a side bet by selecting an option and paying the buy-in from their credit balance.
-- The manager, or an admin, settles the side bet by choosing the winning option.
+- A coin flip is managed by the user who created it.
+- A coin flip has a title, description, optional source URL, buy-in amount, start time, close time, options, status, and optional winning option.
+- Users join a coin flip by selecting an option and paying the buy-in from their credit balance.
+- The manager, or an admin, settles the coin flip by choosing the winning option.
 - Winners split the pot after the house fee. The current default house fee is `0%`.
 - Users can request credits, and admins approve or reject those requests before credits are added.
 - Admin users can view platform summaries, add credits to users, and inspect transaction history.
@@ -53,7 +53,7 @@ Node/Express server on :4123
 Supabase
   |
   | Auth: Google SSO users and JWTs
-  | Postgres: profiles, side bets, entries, transactions
+  | Postgres: profiles, coin flips, entries, transactions
 ```
 
 ### Request Flow
@@ -65,7 +65,7 @@ Supabase
 5. The server upserts the user's profile if needed.
 6. The server uses the Supabase service role key for trusted database operations.
 7. Socket.IO connections also authenticate with the Supabase access token.
-8. When a side bet changes, the server broadcasts a `side-bet:changed` event and clients refresh their data.
+8. When a coin flip changes, the server broadcasts a `side-bet:changed` event and clients refresh their data.
 
 ### Why One Port?
 
@@ -128,7 +128,7 @@ The first migration creates:
 - `side_bets`
   Bet definition, timing, options, status, manager, fee, and result.
 - `bet_entries`
-  A user's selected option and stake for a side bet.
+  A user's selected option and stake for a coin flip.
 - `credit_transactions`
   Immutable-style transaction records for admin credit adjustments, buy-ins, payouts, fees, withdrawals, and future payment deposits.
 - `redemption_requests`
@@ -226,7 +226,7 @@ APIs & Services -> OAuth consent screen
 
 Create or configure the consent screen:
 
-- App name: `SideBet`
+- App name: `Coin flip`
 - User support email: your email
 - Developer contact email: your email
 
@@ -355,25 +355,11 @@ Use it from Render:
 
 1. Push this repo to GitHub.
 2. In Render, choose `New` -> `Blueprint`.
-3. Connect the `garney/side-bets` repository.
-4. Render will read `render.yaml` and create a Node web service.
-5. Add the required environment variables in Render.
+3. Connect the `garney/coin-flip` repository.
+4. Render will read `render.yaml` and create a Docker web service.
+5. Enter the environment variables when Render asks. `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are baked into the client during the image build, so a change to those two needs a new deploy.
 
-The Blueprint uses:
-
-```bash
-npm ci --include=dev && npm run build
-```
-
-for the build, and:
-
-```bash
-NODE_ENV=production npm start
-```
-
-for runtime.
-
-Render provides `PORT` automatically, so do not hard-code `PORT` in Render unless you have a specific reason.
+Pushes to `main` auto-deploy. Render sets `PORT` and the process listens on `0.0.0.0`.
 
 ### Render Environment Variables
 
@@ -395,7 +381,7 @@ ADMIN_USER_IDS=comma-separated-admin-user-ids
 After Render creates the service, it will give you a URL like:
 
 ```text
-https://side-bets.onrender.com
+https://coin-flip.onrender.com
 ```
 
 In Supabase, go to:
@@ -407,9 +393,9 @@ Authentication -> URL Configuration
 Set or add:
 
 ```text
-Site URL: https://side-bets.onrender.com
-Redirect URL: https://side-bets.onrender.com
-Redirect URL: https://side-bets.onrender.com/auth/callback
+Site URL: https://coin-flip.onrender.com
+Redirect URL: https://coin-flip.onrender.com
+Redirect URL: https://coin-flip.onrender.com/auth/callback
 ```
 
 Keep the local URLs too if you still want local development:
@@ -491,7 +477,7 @@ This is an early scaffold. The following pieces are intentionally basic:
 1. Finish Supabase + Google SSO setup.
 2. Log in locally and verify profile creation.
 3. Add yourself as an admin.
-4. Request credits as a user, approve the request from the admin centre, then create and join a side bet.
+4. Request credits as a user, approve the request from the admin centre, then create and join a coin flip.
 5. Add withdrawal and richer admin adjustment flows.
 6. Add tests around wallet balance changes and settlement payout math.
 7. Add production payment integration when credits become real money.

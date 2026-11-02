@@ -35,7 +35,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       ? metadata.full_name
       : typeof metadata.name === "string"
         ? metadata.name
-        : user.email?.split("@")[0] ?? "Side bettor";
+        : user.email?.split("@")[0] ?? "Coin fliptor";
   const avatarUrl = typeof metadata.avatar_url === "string" ? metadata.avatar_url : null;
 
   await supabaseAdmin.from("profiles").upsert(

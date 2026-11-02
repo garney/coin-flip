@@ -11,7 +11,7 @@ export const SAME_FACE_PROBABILITY = 0.51;
 export const EDGE_PROBABILITY = 1 / 6000;
 export const COIN_FLIP_SOURCE = "sidebets:coin-flip";
 export const COIN_FLIP_BUY_IN = 1;
-export const WINDOW_MS = 10 * 60 * 1000;
+export const WINDOW_MS = 60 * 1000;
 
 export type CoinFace = "heads" | "tails";
 export type CoinOutcome = CoinFace | "edge";
