@@ -66,6 +66,12 @@ type FlipRow = {
   options: { id: string; label: string }[];
 };
 
+async function adjustCredits(userId: string, delta: number) {
+  const { data, error } = await supabaseAdmin.rpc("adjust_credits", { p_user_id: userId, p_delta: delta });
+  if (error || data === null || data === undefined) throw new Error(error?.message ?? "Not enough credits");
+  return Number(data);
+}
+
 async function findWindowBet(startsAt: string) {
   const { data, error } = await supabaseAdmin
     .from("side_bets")
@@ -241,9 +247,8 @@ export async function stakeCoinFlip(userId: string, optionId: CoinOutcome, realt
   });
   if (entryError) throw new Error(entryError.message);
 
-  const nextBalance = Number(profileResult.data.credits_balance) - COIN_FLIP_BUY_IN;
-  const [balanceResult, transactionResult] = await Promise.all([
-    supabaseAdmin.from("profiles").update({ credits_balance: nextBalance }).eq("id", userId),
+  const [nextBalance, transactionResult] = await Promise.all([
+    adjustCredits(userId, -COIN_FLIP_BUY_IN),
     supabaseAdmin
       .from("credit_transactions")
       .insert({
@@ -257,7 +262,6 @@ export async function stakeCoinFlip(userId: string, optionId: CoinOutcome, realt
       .select("id, created_at")
       .single()
   ]);
-  if (balanceResult.error) throw new Error(balanceResult.error.message);
   if (transactionResult.error || !transactionResult.data) throw new Error(transactionResult.error?.message ?? "Could not record the stake");
 
   const transaction = transactionResult.data;
@@ -299,19 +303,34 @@ export async function settleDueCoinFlips(realtime: RealtimeNotifier) {
       continue;
     }
 
+    const claimed = await supabaseAdmin
+      .from("side_bets")
+      .update({
+        status: "settled",
+        winning_option_id: winningOptionId,
+        settles_at: new Date().toISOString()
+      })
+      .eq("id", row.id)
+      .eq("status", "open")
+      .select("id")
+      .maybeSingle();
+    if (claimed.error || !claimed.data) continue;
+
     const winners = list.filter((entry) => entry.option_id === winningOptionId);
     const pot = list.reduce((total, entry) => total + Number(entry.stake_credits), 0);
-    const refunds = winners.length === 0;
+    const everyoneWon = winners.length === list.length;
+    const refunds = winners.length === 0 || everyoneWon;
     const paid = refunds ? list : winners;
 
     for (const entry of paid) {
       const amount = refunds ? Number(entry.stake_credits) : pot / winners.length;
-      const { data: profile } = await supabaseAdmin.from("profiles").select("credits_balance").eq("id", entry.user_id).single();
-      if (!profile) continue;
-      const nextBalance = Number(profile.credits_balance) + amount;
-      const description = refunds ? `Coin flip refund (${winningOptionId}, no winners)` : `Coin flip payout (${winningOptionId})`;
+      const nextBalance = await adjustCredits(entry.user_id, amount);
+      const description = winners.length === 0
+        ? `Coin flip refund (${winningOptionId}, no winners)`
+        : everyoneWon
+          ? `Coin flip stake returned (${winningOptionId})`
+          : `Coin flip payout (${winningOptionId})`;
       const kind = refunds ? "adjustment" : "payout";
-      await supabaseAdmin.from("profiles").update({ credits_balance: nextBalance }).eq("id", entry.user_id);
       const { data: transaction } = await supabaseAdmin
         .from("credit_transactions")
         .insert({
@@ -339,16 +358,6 @@ export async function settleDueCoinFlips(realtime: RealtimeNotifier) {
         });
       }
     }
-
-    await supabaseAdmin
-      .from("side_bets")
-      .update({
-        status: "settled",
-        winning_option_id: winningOptionId,
-        settles_at: new Date().toISOString()
-      })
-      .eq("id", row.id)
-      .eq("status", "open");
 
     await realtime.sideBetChanged(row.id, "settled");
     await realtime.coinFlipChanged();
