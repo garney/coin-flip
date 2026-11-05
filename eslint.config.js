@@ -23,7 +23,15 @@ export default [
         PointerEvent: "readonly",
         process: "readonly",
         RequestInit: "readonly",
-        window: "readonly"
+        window: "readonly",
+        localStorage: "readonly",
+        HTMLElement: "readonly",
+        HTMLSpanElement: "readonly",
+        Image: "readonly",
+        setTimeout: "readonly",
+        clearTimeout: "readonly",
+        setInterval: "readonly",
+        clearInterval: "readonly"
       },
       parserOptions: {
         ecmaVersion: "latest",

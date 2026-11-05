@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Router } from "express";
 import { z } from "zod";
+import type { WalletChangeDetail } from "./credits.js";
 import type {
   AdminSummary,
   AdminUser,
@@ -109,7 +110,7 @@ const STATION_ALPHA_GROUP_NAME = "Station Alpha";
 
 type RealtimeNotifier = {
   sideBetChanged: (betId: string, reason: string) => Promise<void>;
-  walletChanged: (userIds: string | string[], reason: string, detail?: { creditsBalance: number; transaction: unknown }) => Promise<void>;
+  walletChanged: (userIds: string | string[], reason: string, detail?: WalletChangeDetail) => Promise<void>;
   coinFlipChanged: () => Promise<void>;
   adminChanged: (reason: string) => Promise<void>;
   chatMessage: (message: ChatMessage) => Promise<void>;

@@ -3,6 +3,7 @@ import { Server } from "socket.io";
 import { getCoinFlipState, type CoinOutcome, type stakeCoinFlip } from "./coinFlip.js";
 import { config } from "./config.js";
 import { supabaseAdmin, supabaseAuth } from "./supabase.js";
+import { enrichSocketUser } from "./blackjack/sockets.js";
 
 export function createSocketServer(
   httpServer: HttpServer,
@@ -32,6 +33,7 @@ export function createSocketServer(
 
     socket.data.userId = data.user.id;
     socket.data.isAdmin = Boolean(adminRow) || config.adminUserIds.has(data.user.id);
+    await enrichSocketUser(socket, data.user.id);
     next();
   });
 

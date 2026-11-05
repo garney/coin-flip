@@ -8,6 +8,9 @@ import { createApiRouter } from "./routes.js";
 import { assertServerConfig, config } from "./config.js";
 import { createSocketServer } from "./socket.js";
 import type { ChatMessage } from "../shared/types.js";
+import { BlackjackTableManager } from "./blackjack/tableManager.js";
+import { registerBlackjackSockets } from "./blackjack/sockets.js";
+import type { WalletChangeDetail } from "./credits.js";
 
 assertServerConfig();
 
@@ -23,7 +26,7 @@ const realtime = {
   async sideBetChanged(betId: string, reason: string) {
     io.to("side-bets").to(`side-bet:${betId}`).emit("side-bet:changed", { betId, reason });
   },
-  async walletChanged(userIds: string | string[], reason: string, detail?: { creditsBalance: number; transaction: unknown }) {
+  async walletChanged(userIds: string | string[], reason: string, detail?: WalletChangeDetail) {
     const ids = Array.isArray(userIds) ? userIds : [userIds];
     for (const userId of [...new Set(ids)]) {
       io.to(`user:${userId}`).emit("wallet:changed", detail ? { reason, ...detail } : { reason });
@@ -43,8 +46,15 @@ const realtime = {
     }
 
     io.to("chat:general").emit("chat:message", message);
+  },
+  blackjackLobby(groupId: string) {
+    io.to(`blackjack:lobby:${groupId}`).emit("blackjack:lobby", tableManager.listLobby(groupId));
   }
 };
+
+const tableManager = new BlackjackTableManager(realtime);
+tableManager.attachIo(io);
+registerBlackjackSockets(io, tableManager);
 
 app.use("/api", createApiRouter(realtime));
 
@@ -55,7 +65,10 @@ if (config.nodeEnv === "production") {
 } else {
   const { createServer } = await import("vite");
   const vite = await createServer({
-    server: { middlewareMode: true },
+    server: {
+      middlewareMode: true,
+      hmr: { server }
+    },
     appType: "spa",
     root: path.resolve(process.cwd(), "client")
   });

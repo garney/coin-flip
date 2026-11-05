@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { Bell, CheckCircle2, CircleDollarSign, Loader2, LogOut, Menu, MessageCircle, Plus, Search, Send, ShieldCheck, Trophy, UserCircle2, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense, type FormEvent, type ReactNode } from "react";
+import { Bell, CheckCircle2, CircleDollarSign, Loader2, LogOut, Menu, MessageCircle, Plus, Search, Send, ShieldCheck, Spade, Trophy, UserCircle2, X } from "lucide-react";
 import { io, type Socket } from "socket.io-client";
 import type {
   AdminSummary,
@@ -17,6 +17,20 @@ import type {
 import { api, type CoinFlipState } from "./api";
 import { CoinFlipPanel } from "./CoinFlipModal";
 import { supabase } from "./supabase";
+
+const BlackjackPage = lazy(() => import("./blackjack/BlackjackPage").then((module) => ({ default: module.BlackjackPage })));
+
+function isBlackjackPath() {
+  return window.location.pathname.startsWith("/blackjack");
+}
+
+function pushBlackjackPath() {
+  window.history.pushState({}, "", "/blackjack");
+}
+
+function pushHomePath() {
+  window.history.pushState({}, "", "/");
+}
 
 type SessionState = "loading" | "signed-out" | "signed-in";
 type AppView = "side-bets" | "groups" | "admin";
@@ -92,6 +106,7 @@ export function App() {
   const [sideBetCommentDraft, setSideBetCommentDraft] = useState("");
   const [sideBetCommentBusy, setSideBetCommentBusy] = useState(false);
   const [view, setView] = useState<AppView>("side-bets");
+  const [onBlackjack, setOnBlackjack] = useState(isBlackjackPath);
   const [menuOpen, setMenuOpen] = useState(false);
   const [coinFlip, setCoinFlip] = useState<CoinFlipState | null>(null);
   const [message, setMessage] = useState("");
@@ -190,6 +205,7 @@ export function App() {
     function syncRoute() {
       const nextSideBetId = getSideBetIdFromPath();
       setRouteSideBetId(nextSideBetId);
+      setOnBlackjack(isBlackjackPath());
       if (nextSideBetId) {
         setSelectedSideBetId(null);
       }
@@ -610,6 +626,19 @@ export function App() {
     );
   }
 
+  if (sessionState === "signed-in" && onBlackjack) {
+    return (
+      <Suspense fallback={<main className="center-screen">Loading blackjack…</main>}>
+        <BlackjackPage
+          onExit={() => {
+            pushHomePath();
+            setOnBlackjack(false);
+          }}
+        />
+      </Suspense>
+    );
+  }
+
   return (
     <main className="app-shell">
       <header className="topbar">
@@ -617,6 +646,19 @@ export function App() {
           <img className="brand-logo" src="/assets/coinflip-logo.jpg" alt="Coin flip" />
         </div>
         <div className="topbar-actions">
+          <button
+            type="button"
+            className="icon-button"
+            title="Blackjack tables"
+            aria-label="Open blackjack"
+            onClick={() => {
+              pushBlackjackPath();
+              setOnBlackjack(true);
+              setMenuOpen(false);
+            }}
+          >
+            <Spade size={18} />
+          </button>
           <div className="view-switch" aria-label="View switcher">
             <button
               className={view === "side-bets" ? "active" : ""}
@@ -664,6 +706,16 @@ export function App() {
           </button>
           {menuOpen ? (
             <div className="nav-menu" role="menu">
+              <button
+                type="button"
+                onClick={() => {
+                  pushBlackjackPath();
+                  setOnBlackjack(true);
+                  setMenuOpen(false);
+                }}
+              >
+                Blackjack
+              </button>
               <button
                 type="button"
                 className={view === "side-bets" ? "active" : ""}

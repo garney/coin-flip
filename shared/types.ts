@@ -148,3 +148,43 @@ export type AdminUser = {
   email: string | null;
   creditsBalance: number;
 };
+
+export type PublicTable = {
+  id: string;
+  groupId: string;
+  mode: "live" | "practice";
+  title: string;
+  dealerUserId: string | null;
+  dealerName: string;
+  dealerAway: boolean;
+  dealerBankroll: number | null;
+  minBet: number;
+  maxBet: number;
+  maxSeats: number;
+  seatedCount: number;
+  phase: "open" | "betting" | "playing" | "dealer" | "finished";
+  round: number;
+  seats: Array<{
+    userId: string;
+    displayName: string;
+    seatIndex: number;
+    bet: number;
+    hand: Array<{ suit: string; rank: number; label: string }>;
+    handTotal: number | null;
+    status: string;
+    practiceChips: number | null;
+    idleEndsAt: number | null;
+  }>;
+  dealerHand: Array<{ suit: string; rank: number; label: string }>;
+  dealerTotal: number | null;
+  activeSeatIndex: number | null;
+  turnEndsAt: number | null;
+  dealStartsAt: number | null;
+  lastRoundResults: Array<{
+    userId: string;
+    outcome: "win" | "lose" | "push" | "blackjack" | "bust";
+    bet: number;
+    payout: number;
+    net: number;
+  }>;
+};
