@@ -389,9 +389,13 @@ export function BlackjackPage({ onExit }: Props) {
                   ? "You can leave after this round finishes."
                   : "You will give up this seat."}
             </p>
+            <div className="modal-actions">
+            <button type="button" onClick={() => setConfirmLeave(false)}>
+              Stay
+            </button>
             <button
               type="button"
-              className="primary"
+              className="danger"
               disabled={
                 busy ||
                 ((table.phase === "playing" || table.phase === "dealer") && (Boolean(isHost) || seated))
@@ -400,9 +404,7 @@ export function BlackjackPage({ onExit }: Props) {
             >
               {isHost && table.mode === "live" ? "Close and refund" : "Leave seat"}
             </button>
-            <button type="button" onClick={() => setConfirmLeave(false)}>
-              Stay
-            </button>
+            </div>
           </div>
         </div>
       ) : null}

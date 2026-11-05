@@ -499,6 +499,41 @@ button:disabled {
   width: min(420px, 100%);
 }
 
+.confirm-modal h2 {
+  margin: 0 0 8px;
+}
+
+.confirm-modal p {
+  margin: 0 0 18px;
+  color: #5d6b63;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.confirm-modal .modal-actions button {
+  min-height: 44px;
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 1px solid #d5ddd8;
+  background: #fff;
+  color: #17211c;
+  font-weight: 700;
+}
+
+.confirm-modal .modal-actions button.danger {
+  background: #8d2b16;
+  border-color: #8d2b16;
+  color: #fff;
+}
+
+.confirm-modal .modal-actions button:disabled {
+  opacity: 0.45;
+}
+
 .open-seats-note {
   display: none;
   margin: 8px 0 0;
