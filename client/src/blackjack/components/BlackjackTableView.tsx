@@ -119,6 +119,7 @@ export function BlackjackTableView({
         <span>
           {phaseLabel} · Round {table.round}
           {table.mode === "live" && table.dealerBankroll != null ? ` · bankroll ${table.dealerBankroll}` : ""}
+          {table.mode === "practice" && mySeat ? ` · ${mySeat.practiceChips ?? 0} practice chips` : ""}
         </span>
         {dealIn != null ? <span>Dealing in {dealIn}s</span> : null}
         {turnIn != null ? (
@@ -183,6 +184,7 @@ export function BlackjackTableView({
                   </strong>
                   <span className={active ? "turn-pill" : "seat-meta"}>
                     {active ? "Your turn" : seatStatus(seat, false)}
+                    {table.mode === "practice" && seat.practiceChips != null ? ` · ${seat.practiceChips} chips` : ""}
                   </span>
                 </>
               ) : (
